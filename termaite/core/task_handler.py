@@ -10,6 +10,11 @@ from ..llm import create_llm_client, create_payload_builder, parse_llm_plan, par
 from ..commands import create_command_executor, create_permission_manager, create_safety_checker
 from ..constants import CLR_GREEN, CLR_RESET, CLR_BOLD_GREEN
 
+# Retry limits for robustness against non-deterministic LLM behavior
+MAX_PLANNER_RETRIES = 10
+MAX_ACTION_RETRIES = 5
+MAX_EVAL_RETRIES = 5
+
 
 class TaskStatus(Enum):
     """Task execution status."""
@@ -43,6 +48,11 @@ class TaskState:
     planner_summary: str = ""
     actor_summary: str = ""
     evaluator_summary: str = ""
+    
+    # Retry counters for robustness
+    planner_retry_count: int = 0
+    action_retry_count: int = 0
+    eval_retry_count: int = 0
     
     def __post_init__(self):
         if self.plan_array is None:
@@ -108,9 +118,28 @@ class TaskHandler:
             
             # Execute action phase
             if not state.current_instruction:
-                logger.error("ACTION phase: No current instruction")
-                task_status = TaskStatus.FAILED
-                break
+                # Planner failed to provide instruction - retry with more specific context
+                if state.planner_retry_count < MAX_PLANNER_RETRIES:
+                    state.planner_retry_count += 1
+                    logger.warning(f"ACTION phase: No current instruction (planner retry {state.planner_retry_count}/{MAX_PLANNER_RETRIES})")
+                    
+                    # Build more specific context for planner retry
+                    retry_context = self._build_planner_retry_context(user_prompt, state)
+                    task_status = self._execute_plan_phase(retry_context, state)
+                    if task_status != TaskStatus.IN_PROGRESS:
+                        break
+                    
+                    # If we still don't have an instruction after retry, continue the loop to try again
+                    if not state.current_instruction:
+                        continue
+                else:
+                    logger.error(f"ACTION phase: No current instruction after {MAX_PLANNER_RETRIES} planner retries - task failed")
+                    task_status = TaskStatus.FAILED
+                    break
+                
+            # Reset planner retry count on successful instruction
+            if state.current_instruction:
+                state.planner_retry_count = 0
                 
             task_status = self._execute_action_phase(current_context, state)
             if task_status != TaskStatus.IN_PROGRESS:
@@ -182,13 +211,19 @@ class TaskHandler:
         
         # Validate plan and instruction
         if not state.current_plan:
-            logger.warning("Planner did not return a checklist")
+            if state.planner_retry_count > 0:
+                logger.warning(f"Planner did not return a checklist (retry {state.planner_retry_count + 1})")
+            else:
+                logger.warning("Planner did not return a checklist")
             state.last_eval_decision = "REVISE_PLAN"
             state.current_plan = ""
             return TaskStatus.IN_PROGRESS
             
         if not state.current_instruction:
-            logger.warning("Planner did not return an instruction")
+            if state.planner_retry_count > 0:
+                logger.warning(f"Planner did not return an instruction (retry {state.planner_retry_count + 1})")
+            else:
+                logger.warning("Planner did not return an instruction")
             state.last_eval_decision = "REVISE_PLAN"
             state.current_plan = ""
             return TaskStatus.IN_PROGRESS
@@ -204,6 +239,84 @@ class TaskHandler:
         state.last_eval_decision = ""
         
         return TaskStatus.IN_PROGRESS
+    
+    def _build_planner_retry_context(self, user_prompt: str, state: TaskState) -> str:
+        """Build enhanced context for planner retries when initial planning fails.
+        
+        Args:
+            user_prompt: Original user request
+            state: Current task state
+            
+        Returns:
+            Enhanced context string for planner retry
+        """
+        retry_context = f"Original request: '{user_prompt}'"
+        
+        if state.planner_retry_count == 1:
+            retry_context += (
+                "\n\nIMPORTANT: Your previous response did not include a proper <instruction> section. "
+                "You MUST provide both a <checklist> (plan steps) AND an <instruction> (next action) "
+                "in your response. The instruction should be a specific, actionable step."
+            )
+        elif state.planner_retry_count <= 3:
+            retry_context += (
+                f"\n\nCRITICAL (Retry {state.planner_retry_count}): You must include BOTH sections:\n"
+                "1. <checklist>\n- Step 1: [description]\n- Step 2: [description]\n</checklist>\n"
+                "2. <instruction>Specific action to take now</instruction>\n\n"
+                "This is required for the system to function properly."
+            )
+        else:
+            retry_context += (
+                f"\n\nURGENT (Retry {state.planner_retry_count}): Previous attempts failed to provide required format. "
+                "You MUST respond with exactly this structure:\n\n"
+                "<checklist>\n- [First step]\n- [Second step]\n- [etc]\n</checklist>\n\n"
+                "<instruction>[Specific first action to take]</instruction>\n\n"
+                "Without both sections, the task cannot proceed."
+            )
+        
+        # Add context about previous failures if available
+        if state.last_action_taken:
+            retry_context += f"\n\nPrevious context: {state.last_action_taken}"
+        if state.last_action_result:
+            retry_context += f"\nPrevious result: {state.last_action_result}"
+            
+        return retry_context
+    
+    def _build_eval_retry_context(self, original_context: str, state: TaskState) -> str:
+        """Build enhanced context for evaluator retries when initial evaluation fails.
+        
+        Args:
+            original_context: Original evaluation context
+            state: Current task state
+            
+        Returns:
+            Enhanced context string for evaluator retry
+        """
+        retry_context = original_context
+        
+        if state.eval_retry_count == 1:
+            retry_context += (
+                "\n\nIMPORTANT: Your previous response did not include a proper <decision> section. "
+                "You MUST provide a decision using this exact format:\n"
+                "<decision>DECISION_TYPE: Your message here</decision>\n\n"
+                "Valid decision types: CONTINUE_PLAN, REVISE_PLAN, TASK_COMPLETE, TASK_FAILED"
+            )
+        elif state.eval_retry_count <= 3:
+            retry_context += (
+                f"\n\nCRITICAL (Eval Retry {state.eval_retry_count}): You must include a decision tag:\n"
+                "<decision>CONTINUE_PLAN: Continue with next step</decision>\n"
+                "<decision>REVISE_PLAN: Plan needs updating</decision>\n"
+                "<decision>TASK_COMPLETE: Task objective achieved</decision>\n"
+                "<decision>TASK_FAILED: Task cannot be completed</decision>\n\n"
+                "Choose the most appropriate decision based on the action result."
+            )
+        else:
+            retry_context += (
+                f"\n\nURGENT (Eval Retry {state.eval_retry_count}): You MUST respond with a decision tag. "
+                "Example: <decision>CONTINUE_PLAN: Moving to next step</decision>"
+            )
+            
+        return retry_context
     
     def _execute_action_phase(self, context: str, state: TaskState) -> TaskStatus:
         """Execute the action phase."""
@@ -348,8 +461,20 @@ class TaskHandler:
         
         decision = parse_llm_decision(response)
         if not decision:
-            logger.warning("Evaluator: no decision. Assuming CONTINUE_PLAN")
-            decision = "CONTINUE_PLAN: No decision by LLM. Defaulting to continue."
+            # Evaluator failed to provide decision - retry with more specific context
+            if state.eval_retry_count < MAX_EVAL_RETRIES:
+                state.eval_retry_count += 1
+                logger.warning(f"Evaluator: no decision provided (eval retry {state.eval_retry_count}/{MAX_EVAL_RETRIES})")
+                
+                # Build retry context with clearer instructions
+                retry_context = self._build_eval_retry_context(context, state)
+                return self._execute_evaluation_phase(retry_context, state)
+            else:
+                logger.warning(f"Evaluator: no decision after {MAX_EVAL_RETRIES} retries. Assuming CONTINUE_PLAN")
+                decision = "CONTINUE_PLAN: No decision by LLM after retries. Defaulting to continue."
+        else:
+            # Reset eval retry count on successful decision
+            state.eval_retry_count = 0
         
         logger.eval_agent(f"[Evaluator Decision]: {decision}")
         
