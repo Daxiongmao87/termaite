@@ -5,8 +5,8 @@
 *This section contains the high-level task list that the AI generates and maintains*
 
 ### Phase 1: Foundation Setup (13 tasks)
-- [ ] **1.1.1** Create Monorepo Structure
-- [ ] **1.1.2** Create CLI Package Structure  
+- [x] **1.1.1** Create Monorepo Structure
+- [x] **1.1.2** Create CLI Package Structure  
 - [ ] **1.1.3** Create Core Package Structure
 - [ ] **1.1.4** Setup Build Configuration
 - [ ] **1.1.5** Configure Development Environment
@@ -110,190 +110,130 @@
 
 ## 🚧 Current Task Work
 
-**Currently Working On:** Task 1.1.1 - Create Monorepo Structure
+**Currently Working On:** Task 1.1.2 - Create CLI Package Structure
 
 ### Task Overview
-Create the root workspace configuration for the monorepo structure that will house both the CLI and Core packages.
+Create the React/Ink CLI package structure with TypeScript configuration and basic setup.
 
 ### Objective
-Set up a monorepo workspace that manages both `packages/cli` and `packages/core` with shared dependencies and build tools.
+Set up the packages/cli directory with all necessary configuration files and basic structure for the React/Ink-based terminal UI.
+
+### Prerequisites ✅
+- Task 1.1.1 (Create Monorepo Structure) completed
+- Root workspace configuration functional
 
 ### Files to Create/Modify
 
-#### 1. Root package.json
-**File**: `/package.json`
+#### 1. CLI Package Configuration
+**File**: `/packages/cli/package.json`
 **Content Requirements**:
-- Workspace configuration for packages/cli and packages/core
-- Development dependencies for build tools
-- Scripts for workspace management
-- Node.js version requirements
+- React/Ink dependencies for terminal UI
+- TypeScript configuration with JSX support
+- Build and development scripts
+- Proper module exports for CLI
 
-```json
-{
-  "name": "termaite-workspace",
-  "version": "2.0.0",
-  "private": true,
-  "workspaces": [
-    "packages/*"
-  ],
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "scripts": {
-    "build": "npm run build --workspaces",
-    "dev": "npm run dev --workspaces",
-    "test": "npm run test --workspaces",
-    "clean": "rimraf packages/*/dist packages/*/build node_modules/.cache",
-    "install-all": "npm install --workspaces"
-  },
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
-    "esbuild": "^0.19.0",
-    "rimraf": "^5.0.0",
-    "concurrently": "^8.0.0",
-    "nodemon": "^3.0.0"
-  }
-}
-```
-
-#### 2. TypeScript Configuration
-**File**: `/tsconfig.json`
+#### 2. TypeScript Configuration  
+**File**: `/packages/cli/tsconfig.json`
 **Content Requirements**:
-- Project references for packages
-- Shared TypeScript configuration
-- Path mapping for packages
+- CLI-specific TypeScript settings
+- React/JSX configuration
+- Module resolution for monorepo
+- Project references to core package
 
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "module": "commonjs",
-    "lib": ["ES2022"],
-    "declaration": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "baseUrl": ".",
-    "paths": {
-      "@termaite/core": ["./packages/core/src"],
-      "@termaite/core/*": ["./packages/core/src/*"],
-      "@termaite/cli": ["./packages/cli/src"],
-      "@termaite/cli/*": ["./packages/cli/src/*"]
-    }
-  },
-  "references": [
-    { "path": "./packages/core" },
-    { "path": "./packages/cli" }
-  ],
-  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
-}
-```
+#### 3. Test Configuration
+**File**: `/packages/cli/vitest.config.ts`
+**Content Requirements**:
+- Vitest configuration for testing
+- React testing setup with ink-testing-library
+- Mock configurations
 
-#### 3. Package Directories
-**Directories to Create**:
-- `packages/` - Root directory for all packages
-- `packages/cli/` - CLI package directory
-- `packages/core/` - Core package directory
+#### 4. Main Entry Point
+**File**: `/packages/cli/src/main.tsx`
+**Content Requirements**:
+- CLI entry point with React/Ink rendering
+- Command line argument parsing with commander
+- Basic error handling
+- App component rendering with options
 
-#### 4. Workspace Scripts
-**File**: `/scripts/workspace-setup.js`
-**Content**: Setup script for initializing workspace
+#### 5. App Component Placeholder
+**File**: `/packages/cli/src/ui/App.tsx`
+**Content Requirements**:
+- Basic React functional component
+- Props interface for configuration
+- Placeholder layout structure
+- Error boundary setup
 
-```javascript
-#!/usr/bin/env node
-
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
-
-console.log('🚀 Setting up termaite workspace...');
-
-// Create package directories
-const packages = ['cli', 'core'];
-packages.forEach(pkg => {
-  const pkgDir = path.join('packages', pkg);
-  if (!fs.existsSync(pkgDir)) {
-    fs.mkdirSync(pkgDir, { recursive: true });
-    console.log(`✅ Created ${pkgDir}`);
-  }
-});
-
-// Install dependencies
-console.log('📦 Installing dependencies...');
-try {
-  execSync('npm install', { stdio: 'inherit' });
-  console.log('✅ Dependencies installed successfully');
-} catch (error) {
-  console.error('❌ Failed to install dependencies:', error.message);
-  process.exit(1);
-}
-
-console.log('🎉 Workspace setup complete!');
-```
+#### 6. Basic Theme
+**File**: `/packages/cli/src/ui/theme.ts`
+**Content Requirements**:
+- Color palette definition
+- Theme interface for consistency
+- Extensible theme structure
+- Default theme implementation
 
 ### Implementation Steps
 
-1. **Create root package.json**
-   - Define workspace configuration
-   - Add development dependencies
-   - Set up scripts for workspace management
+1. **Create CLI package.json**
+   - Add React/Ink and TypeScript dependencies
+   - Configure build scripts and module exports
+   - Set up testing dependencies
 
-2. **Set up TypeScript configuration**
-   - Configure project references
-   - Set up path mapping for packages
-   - Enable strict type checking
+2. **Configure TypeScript for CLI**
+   - Enable JSX support for React
+   - Configure module resolution
+   - Set up project references
 
-3. **Create package directories**
-   - Create packages/cli directory
-   - Create packages/core directory
-   - Set up proper directory structure
+3. **Create basic directory structure**
+   - src/ directory for source code
+   - ui/ subdirectory for React components
+   - Set up entry point and main files
 
-4. **Create workspace setup script**
-   - Automate directory creation
-   - Handle dependency installation
+4. **Implement basic CLI entry point**
+   - Create main.tsx with command parsing
+   - Set up React/Ink rendering
    - Add error handling
 
-5. **Test workspace configuration**
-   - Verify npm workspaces work
-   - Test TypeScript compilation
-   - Validate directory structure
+5. **Create placeholder App component**
+   - Basic layout with header/footer
+   - Props interface for configuration
+   - Simple initialization logic
+
+6. **Set up testing configuration**
+   - Configure Vitest for React testing
+   - Set up ink-testing-library
+   - Create test setup files
 
 ### Validation Criteria
 
-#### ✅ Workspace Configuration
-- [ ] `npm install` works without errors
-- [ ] Workspace commands execute properly
-- [ ] Package directories are created
-- [ ] TypeScript paths resolve correctly
+#### ✅ Package Configuration
+- [ ] package.json has all required dependencies
+- [ ] Scripts work for build/dev/test
+- [ ] TypeScript configuration compiles
+- [ ] Module exports are properly configured
 
-#### ✅ Directory Structure
-- [ ] `packages/` directory exists
-- [ ] `packages/cli/` directory exists  
-- [ ] `packages/core/` directory exists
-- [ ] Root configuration files are in place
+#### ✅ React/Ink Setup
+- [ ] App component renders without errors
+- [ ] CLI entry point works with arguments
+- [ ] Theme system is extensible
+- [ ] JSX compilation works properly
 
-#### ✅ Build System
-- [ ] TypeScript compilation works
-- [ ] Project references are configured
-- [ ] Path mapping works for imports
-- [ ] Workspace scripts execute successfully
+#### ✅ Development Environment
+- [ ] npm run dev works for live development
+- [ ] npm run build creates production output
+- [ ] npm run test executes test suite
+- [ ] Type checking works correctly
 
-#### ✅ Dependencies
-- [ ] All devDependencies install correctly
-- [ ] Node.js version requirements are met
-- [ ] Package manager recognizes workspace
-- [ ] Scripts run across all packages
+#### ✅ Monorepo Integration
+- [ ] Package references work from root
+- [ ] Workspace scripts include CLI package
+- [ ] TypeScript project references function
+- [ ] Cross-package imports work
 
 ### Success Criteria
-✅ **Monorepo workspace is fully configured and ready for package development with proper TypeScript support and build tooling.**
+✅ **CLI package is fully configured with React/Ink setup, TypeScript compilation, testing framework, and basic App component ready for development.**
 
 ### Notes for Implementation
-- Ensure Node.js version is 18+ before setup
-- Test workspace commands after creation
-- Verify TypeScript path mapping works
-- Check that all directories have proper permissions
+- Use ES modules for modern Node.js compatibility
+- Ensure React/Ink version compatibility
+- Test CLI executable with different arguments
+- Validate theme system extensibility

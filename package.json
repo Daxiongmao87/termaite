@@ -1,0 +1,26 @@
+{
+  "name": "termaite-workspace",
+  "version": "2.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "dev": "npm run dev --workspaces",
+    "test": "npm run test --workspaces",
+    "clean": "rimraf packages/*/dist packages/*/build node_modules/.cache",
+    "install-all": "npm install --workspaces"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "esbuild": "^0.19.0",
+    "rimraf": "^5.0.0",
+    "concurrently": "^8.0.0",
+    "nodemon": "^3.0.0"
+  }
+}
