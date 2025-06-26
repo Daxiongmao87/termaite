@@ -110,130 +110,137 @@
 
 ## 🚧 Current Task Work
 
-**Currently Working On:** Task 1.1.2 - Create CLI Package Structure
+**Currently Working On:** Task 1.1.3 - Create Core Package Structure
 
 ### Task Overview
-Create the React/Ink CLI package structure with TypeScript configuration and basic setup.
+Create the Core package structure that will house the backend logic, agent system, LLM integration, and all core functionality migrated from the Python implementation.
 
 ### Objective
-Set up the packages/cli directory with all necessary configuration files and basic structure for the React/Ink-based terminal UI.
+Set up the packages/core directory with TypeScript configuration and the foundation for migrating all backend functionality from the existing Python codebase.
 
 ### Prerequisites ✅
 - Task 1.1.1 (Create Monorepo Structure) completed
+- Task 1.1.2 (Create CLI Package Structure) completed
 - Root workspace configuration functional
 
 ### Files to Create/Modify
 
-#### 1. CLI Package Configuration
-**File**: `/packages/cli/package.json`
+#### 1. Core Package Configuration
+**File**: `/packages/core/package.json`
 **Content Requirements**:
-- React/Ink dependencies for terminal UI
-- TypeScript configuration with JSX support
+- Node.js backend dependencies (WebSocket, YAML, HTTP)
+- TypeScript configuration for backend
 - Build and development scripts
-- Proper module exports for CLI
+- Core functionality exports
 
 #### 2. TypeScript Configuration  
-**File**: `/packages/cli/tsconfig.json`
+**File**: `/packages/core/tsconfig.json`
 **Content Requirements**:
-- CLI-specific TypeScript settings
-- React/JSX configuration
+- Core-specific TypeScript settings
+- Node.js backend configuration
 - Module resolution for monorepo
-- Project references to core package
+- Type definitions for Node.js and Vitest
 
 #### 3. Test Configuration
-**File**: `/packages/cli/vitest.config.ts`
+**File**: `/packages/core/vitest.config.ts`
 **Content Requirements**:
-- Vitest configuration for testing
-- React testing setup with ink-testing-library
-- Mock configurations
+- Vitest configuration for backend testing
+- Coverage configuration with v8 provider
+- Mock configurations for file system and child processes
 
-#### 4. Main Entry Point
-**File**: `/packages/cli/src/main.tsx`
+#### 4. Main Export File
+**File**: `/packages/core/src/index.ts`
 **Content Requirements**:
-- CLI entry point with React/Ink rendering
-- Command line argument parsing with commander
-- Basic error handling
-- App component rendering with options
+- Main exports for the core package
+- Public API surface for all modules
+- Type exports for external consumption
 
-#### 5. App Component Placeholder
-**File**: `/packages/cli/src/ui/App.tsx`
+#### 5. Core Types Definition
+**File**: `/packages/core/src/types/index.ts`
 **Content Requirements**:
-- Basic React functional component
-- Props interface for configuration
-- Placeholder layout structure
-- Error boundary setup
+- Complete type system for agents, LLM, configuration
+- Interfaces for communication and command execution
+- Task state and status enums
+- Shared types across the core package
 
-#### 6. Basic Theme
-**File**: `/packages/cli/src/ui/theme.ts`
+#### 6. Core Application Class
+**File**: `/packages/core/src/core-application.ts`
 **Content Requirements**:
-- Color palette definition
-- Theme interface for consistency
-- Extensible theme structure
-- Default theme implementation
+- Main application orchestrator with lifecycle management
+- Service initialization and coordination
+- Configuration management
+- Error handling and graceful shutdown
+
+#### 7. Test Setup
+**File**: `/packages/core/src/test-setup.ts`
+**Content Requirements**:
+- Test environment configuration
+- Mock setup for file system, child processes, WebSocket
+- Global test utilities and helper functions
 
 ### Implementation Steps
 
-1. **Create CLI package.json**
-   - Add React/Ink and TypeScript dependencies
-   - Configure build scripts and module exports
-   - Set up testing dependencies
+1. **Create core package.json**
+   - Add Node.js backend dependencies
+   - Configure build scripts and exports
+   - Set up testing and coverage
 
-2. **Configure TypeScript for CLI**
-   - Enable JSX support for React
+2. **Configure TypeScript for core**
+   - Enable Node.js backend features
    - Configure module resolution
-   - Set up project references
+   - Set up types for testing
 
-3. **Create basic directory structure**
-   - src/ directory for source code
-   - ui/ subdirectory for React components
-   - Set up entry point and main files
+3. **Create directory structure**
+   - src/ directory with subdirectories
+   - types/, agents/, llm/, communication/
+   - commands/, config/, context/, streaming/
 
-4. **Implement basic CLI entry point**
-   - Create main.tsx with command parsing
-   - Set up React/Ink rendering
-   - Add error handling
+4. **Implement core type system**
+   - Define all interfaces and types
+   - Create enums for status and phases
+   - Set up type exports
 
-5. **Create placeholder App component**
-   - Basic layout with header/footer
-   - Props interface for configuration
-   - Simple initialization logic
+5. **Create application orchestrator**
+   - Main CoreApplication class
+   - Lifecycle management
+   - Service coordination foundation
 
-6. **Set up testing configuration**
-   - Configure Vitest for React testing
-   - Set up ink-testing-library
-   - Create test setup files
+6. **Set up testing framework**
+   - Configure Vitest for backend
+   - Set up mocks for external dependencies
+   - Create test utilities
 
 ### Validation Criteria
 
 #### ✅ Package Configuration
-- [ ] package.json has all required dependencies
-- [ ] Scripts work for build/dev/test
+- [ ] package.json has all backend dependencies
+- [ ] Scripts work for build/dev/test/coverage
 - [ ] TypeScript configuration compiles
 - [ ] Module exports are properly configured
 
-#### ✅ React/Ink Setup
-- [ ] App component renders without errors
-- [ ] CLI entry point works with arguments
-- [ ] Theme system is extensible
-- [ ] JSX compilation works properly
+#### ✅ Type System
+- [ ] Core types compile without errors
+- [ ] Type exports work from main index
+- [ ] Agent, LLM, and config types defined
+- [ ] Communication and command types complete
 
-#### ✅ Development Environment
-- [ ] npm run dev works for live development
-- [ ] npm run build creates production output
-- [ ] npm run test executes test suite
-- [ ] Type checking works correctly
+#### ✅ Application Foundation
+- [ ] CoreApplication class initializes
+- [ ] Lifecycle methods work correctly
+- [ ] Error handling is in place
+- [ ] Configuration loading prepared
 
-#### ✅ Monorepo Integration
-- [ ] Package references work from root
-- [ ] Workspace scripts include CLI package
-- [ ] TypeScript project references function
-- [ ] Cross-package imports work
+#### ✅ Testing Infrastructure
+- [ ] Vitest runs test suite successfully
+- [ ] Coverage reporting works
+- [ ] Mocks are properly configured
+- [ ] Test utilities are available
 
 ### Success Criteria
-✅ **CLI package is fully configured with React/Ink setup, TypeScript compilation, testing framework, and basic App component ready for development.**
+✅ **Core package is fully configured with complete type system, application orchestrator, testing framework, and ready for backend functionality migration.**
 
 ### Notes for Implementation
-- Use ES modules for modern Node.js compatibility
-- Ensure React/Ink version compatibility
-- Test CLI executable with different arguments
-- Validate theme system extensibility
+- Focus on type definitions that will guide backend migration
+- Ensure proper Node.js ES module configuration
+- Set up comprehensive mocking for testing
+- Prepare foundation for agent system architecture
