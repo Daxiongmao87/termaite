@@ -1,0 +1,96 @@
+{
+  "folders": [
+    {
+      "name": "🏠 Root",
+      "path": "."
+    },
+    {
+      "name": "🎨 CLI Package",
+      "path": "./packages/cli"
+    },
+    {
+      "name": "⚙️ Core Package", 
+      "path": "./packages/core"
+    }
+  ],
+  "settings": {
+    "typescript.preferences.includePackageJsonAutoImports": "auto",
+    "typescript.preferences.includeCompletionsWithSnippetText": true,
+    "typescript.suggest.paths": true,
+    "typescript.updateImportsOnFileMove.enabled": "always",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit",
+      "source.organizeImports": "explicit"
+    },
+    "files.associations": {
+      "*.ts": "typescript",
+      "*.tsx": "typescriptreact"
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/.git": true,
+      "**/coverage": true
+    },
+    "files.exclude": {
+      "**/dist": true,
+      "**/node_modules": true
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-vscode.vscode-typescript-next",
+      "bradlc.vscode-tailwindcss",
+      "esbenp.prettier-vscode",
+      "dbaeumer.vscode-eslint",
+      "ms-vscode.vscode-json"
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Build All Packages",
+        "type": "shell",
+        "command": "npm run build",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        }
+      },
+      {
+        "label": "Watch Build",
+        "type": "shell", 
+        "command": "npm run build:watch",
+        "group": "build",
+        "isBackground": true,
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        }
+      },
+      {
+        "label": "Run CLI",
+        "type": "shell",
+        "command": "node packages/cli/dist/main.js",
+        "dependsOn": "Build All Packages",
+        "group": "test",
+        "presentation": {
+          "echo": true,
+          "reveal": "always",
+          "focus": false,
+          "panel": "shared"
+        }
+      }
+    ]
+  }
+}

@@ -14,9 +14,12 @@
     "build:prod": "NODE_ENV=production node esbuild.config.js",
     "build:watch": "node scripts/watch.js",
     "clean": "rimraf packages/*/dist packages/*/node_modules/.cache",
-    "dev:cli": "npm run build:dev && node packages/cli/dist/index.js",
+    "dev:cli": "npm run build:dev && node packages/cli/dist/main.js",
     "dev:core": "npm run build:dev",
-    "lint": "eslint packages/*/src/**/*.{ts,tsx}",
+    "lint": "npx eslint packages/*/src/**/*.{ts,tsx}",
+    "lint:fix": "npx eslint packages/*/src/**/*.{ts,tsx} --fix",
+    "format": "npx prettier --write packages/*/src/**/*.{ts,tsx}",
+    "format:check": "npx prettier --check packages/*/src/**/*.{ts,tsx}",
     "type-check": "npm run type-check --workspaces",
     "install:all": "npm install && npm install --workspaces"
   },
@@ -27,6 +30,12 @@
     "rimraf": "^5.0.0",
     "concurrently": "^8.0.0",
     "nodemon": "^3.0.0",
-    "chokidar": "^3.5.0"
+    "chokidar": "^3.5.0",
+    "eslint": "^8.57.0",
+    "@typescript-eslint/eslint-plugin": "^6.7.0",
+    "@typescript-eslint/parser": "^6.7.0",
+    "eslint-plugin-react": "^7.33.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "prettier": "^3.0.0"
   }
 }
