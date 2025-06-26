@@ -1,12 +1,20 @@
-// Agents module - Agent base classes and utilities
-export { BaseAgent } from './base-agent.js';
-export { 
-  BaseAgent as BaseAgentNew, 
-  AgentFactory, 
+// Agents module - Multi-agent system for terminal automation
+export const AGENTS_MODULE_VERSION = '2.0.0';
+
+// Base agent infrastructure
+export {
+  BaseAgent,
+  AgentFactory,
   AgentUtils,
   type BaseAgentContext,
-  type AgentResponseData 
+  type AgentResponseData
 } from './base.js';
-// export { PlanAgent } from './plan-agent.js';
-// export { ActionAgent } from './action-agent.js';
-// export { EvaluationAgent } from './evaluation-agent.js';
+
+// Specific agent implementations
+export {
+  PlanAgent,
+  type PlanResponse
+} from './planner.js';
+
+// Re-export base types for convenience
+export type { AgentContext, AgentResponse, AgentEvent, AgentType, AgentDecision } from '../types/index.js';

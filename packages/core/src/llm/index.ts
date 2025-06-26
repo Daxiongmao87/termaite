@@ -1,8 +1,8 @@
-// LLM module - LLM abstraction layer with provider support
+// LLM module - Language Model abstraction and utilities
 export const LLM_MODULE_VERSION = '2.0.0';
 
-// Enhanced LLM implementations (extend existing interfaces)
-export { 
+// Core LLM client interfaces and utilities
+export {
   LLMClient as BaseLLMClient,
   LLMClientFactory,
   LLMUtils,
@@ -10,15 +10,23 @@ export {
   type LLMStreamChunk
 } from './client.js';
 
-// Re-export existing types from types module for convenience
-export type { 
-  LLMProvider,
-  LLMRequest,
-  LLMResponse,
-  LLMError,
-  LLMChunk,
-  LLMClient
-} from '../types/index.js';
+// LLM response parsers
+export {
+  parseSuggestedCommand,
+  parseLLMThought,
+  parseLLMPlan,
+  parseLLMInstruction,
+  parseLLMDecision,
+  parseLLMSummary,
+  extractDecisionTypeAndMessage,
+  parseChecklistItems,
+  extractResponseContent,
+  validateResponseFormat,
+  extractAllTags
+} from './parsers.js';
+
+// Re-export base types for convenience
+export type { LLMClient, LLMResponse, LLMChunk, LLMRequest, LLMProvider, LLMError } from '../types/index.js';
 
 // TODO: Uncomment when provider implementations are added
 // export { OllamaClient } from './providers/ollama-client.js';
