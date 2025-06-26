@@ -9,11 +9,16 @@
     "node": ">=18.0.0"
   },
   "scripts": {
-    "build": "npm run build --workspaces",
-    "dev": "npm run dev --workspaces",
-    "test": "npm run test --workspaces",
-    "clean": "rimraf packages/*/dist packages/*/build node_modules/.cache",
-    "install-all": "npm install --workspaces"
+    "build": "node esbuild.config.js",
+    "build:dev": "NODE_ENV=development node esbuild.config.js",
+    "build:prod": "NODE_ENV=production node esbuild.config.js",
+    "build:watch": "node scripts/watch.js",
+    "clean": "rimraf packages/*/dist packages/*/node_modules/.cache",
+    "dev:cli": "npm run build:dev && node packages/cli/dist/index.js",
+    "dev:core": "npm run build:dev",
+    "lint": "eslint packages/*/src/**/*.{ts,tsx}",
+    "type-check": "npm run type-check --workspaces",
+    "install:all": "npm install && npm install --workspaces"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
@@ -21,6 +26,7 @@
     "esbuild": "^0.19.0",
     "rimraf": "^5.0.0",
     "concurrently": "^8.0.0",
-    "nodemon": "^3.0.0"
+    "nodemon": "^3.0.0",
+    "chokidar": "^3.5.0"
   }
 }

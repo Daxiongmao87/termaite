@@ -8,7 +8,7 @@
 - [x] **1.1.1** Create Monorepo Structure
 - [x] **1.1.2** Create CLI Package Structure  
 - [x] **1.1.3** Create Core Package Structure
-- [ ] **1.1.4** Setup Build Configuration
+- [x] **1.1.4** Setup Build Configuration
 - [ ] **1.1.5** Configure Development Environment
 - [ ] **1.2.1** Implement Basic CLI Entry Point
 - [ ] **1.2.2** Create Minimal App Component
@@ -110,13 +110,13 @@
 
 ## 🚧 Current Task Work
 
-**Currently Working On:** Task 1.1.3 - Create Core Package Structure
+**Currently Working On:** Task 1.1.4 - Setup Build Configuration
 
 ### Task Overview
-Create the Core package structure that will house the backend logic, agent system, LLM integration, and all core functionality migrated from the Python implementation.
+Create build configuration using esbuild for fast compilation of both CLI and Core packages.
 
 ### Objective
-Set up the packages/core directory with TypeScript configuration and the foundation for migrating all backend functionality from the existing Python codebase.
+Set up efficient build tools that can compile TypeScript for both packages, handle bundling, and provide development/production builds.
 
 ### Prerequisites ✅
 - Task 1.1.1 (Create Monorepo Structure) completed
