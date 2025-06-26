@@ -1,31 +1,36 @@
 {
   "name": "@termaite/cli",
   "version": "2.0.0",
-  "description": "Rich terminal UI for term.ai.te",
-  "main": "dist/cli.js",
+  "description": "AI-powered terminal automation CLI with React/Ink UI",
+  "main": "dist/main.js",
   "type": "module",
   "bin": {
-    "termaite": "./dist/cli.js"
+    "termaite": "dist/main.js"
   },
   "scripts": {
     "build": "tsc",
-    "dev": "nodemon --watch src --ext ts,tsx --exec \"npm run build\"",
+    "build:watch": "tsc --watch",
+    "dev": "npm run build && node dist/main.js",
     "test": "vitest",
-    "test:ui": "vitest --ui",
-    "type-check": "tsc --noEmit"
+    "test:watch": "vitest --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src/**/*.{ts,tsx}",
+    "lint:fix": "eslint src/**/*.{ts,tsx} --fix"
   },
   "dependencies": {
     "react": "^18.2.0",
     "ink": "^4.4.1",
-    "commander": "^11.0.0",
-    "chalk": "^5.3.0",
-    "ws": "^8.14.0"
+    "commander": "^11.1.0",
+    "@termaite/core": "workspace:*"
   },
   "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@types/ws": "^8.5.0",
-    "vitest": "^1.0.0",
-    "@testing-library/react": "^14.0.0",
+    "@types/react": "^18.2.45",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.4",
+    "@testing-library/react": "^14.1.2",
     "ink-testing-library": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   }
 }
