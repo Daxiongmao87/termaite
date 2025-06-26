@@ -7,33 +7,9 @@ import type { LLMClient, CoreConfig, AgentResponse } from '../types/index.js';
 import { PlanAgent } from './planner.js';
 import { ActionAgent } from './actor.js';
 import { EvaluationAgent } from './evaluator.js';
+import { TaskState, TaskStatus, StateManager, AgentPhase, StateUtils } from './state.js';
 
 export type EvaluationDecisionType = 'TASK_COMPLETE' | 'TASK_FAILED' | 'CONTINUE_PLAN' | 'REVISE_PLAN' | 'CLARIFY_USER' | 'VERIFY_ACTION';
-
-export enum TaskStatus {
-  IN_PROGRESS = 'IN_PROGRESS',
-  COMPLETED = 'COMPLETED',
-  FAILED = 'FAILED',
-  CANCELLED = 'CANCELLED'
-}
-
-export interface TaskState {
-  currentPlan: string;
-  currentInstruction: string;
-  planArray: string[];
-  stepIndex: number;
-  lastActionTaken: string;
-  lastActionResult: string;
-  userClarification: string;
-  lastEvalDecision: string;
-  iteration: number;
-  plannerSummary: string;
-  actorSummary: string;
-  evaluatorSummary: string;
-  plannerRetryCount: number;
-  actionRetryCount: number;
-  evalRetryCount: number;
-}
 
 export interface OrchestratorConfig {
   maxPlannerRetries: number;
@@ -55,6 +31,7 @@ export class AgentOrchestrator extends EventEmitter {
   private actionAgent: ActionAgent;
   private evaluationAgent: EvaluationAgent;
   private config: OrchestratorConfig;
+  private stateManager: StateManager;
 
   constructor(llmClient: LLMClient, coreConfig: CoreConfig) {
     super();
@@ -62,6 +39,7 @@ export class AgentOrchestrator extends EventEmitter {
     this.planAgent = new PlanAgent(llmClient, coreConfig);
     this.actionAgent = new ActionAgent(llmClient, coreConfig);
     this.evaluationAgent = new EvaluationAgent(llmClient, coreConfig);
+    this.stateManager = new StateManager(false); // Disable persistence by default
     
     this.config = {
       maxPlannerRetries: coreConfig.agents.retryLimits.planner,
@@ -75,7 +53,7 @@ export class AgentOrchestrator extends EventEmitter {
   }
 
   async executeTask(userPrompt: string): Promise<TaskResult> {
-    const taskState = this.createInitialTaskState();
+    const taskState = this.stateManager.initializeState(userPrompt);
     let taskStatus = TaskStatus.IN_PROGRESS;
     let currentContext = userPrompt;
 
@@ -83,7 +61,7 @@ export class AgentOrchestrator extends EventEmitter {
 
     try {
       while (taskStatus === TaskStatus.IN_PROGRESS) {
-        taskState.iteration++;
+        taskState.incrementIteration();
         this.emit('iterationStarted', { iteration: taskState.iteration, taskState });
 
         if (this.shouldPlan(taskState)) {
@@ -99,7 +77,7 @@ export class AgentOrchestrator extends EventEmitter {
         }
 
         if (taskState.currentInstruction) {
-          taskState.plannerRetryCount = 0;
+          taskState.resetRetryCount(AgentPhase.PLAN);
         }
 
         taskStatus = await this.executeActionPhase(currentContext, taskState);
@@ -147,9 +125,9 @@ export class AgentOrchestrator extends EventEmitter {
       this.parsePlanResponse(planContent, taskState);
       
       if (!taskState.currentInstruction) {
-        taskState.plannerRetryCount++;
-        if (taskState.plannerRetryCount <= this.config.maxPlannerRetries) {
-          const retryContext = this.buildContext('planRetry', context, taskState);
+        const retryCount = taskState.incrementRetryCount(AgentPhase.PLAN);
+        if (retryCount <= this.config.maxPlannerRetries) {
+          const retryContext = StateUtils.buildRetryContext(AgentPhase.PLAN, retryCount, context);
           return this.executePlanPhase(retryContext, taskState);
         } else {
           return TaskStatus.FAILED;
@@ -160,9 +138,9 @@ export class AgentOrchestrator extends EventEmitter {
       return TaskStatus.IN_PROGRESS;
 
     } catch (error) {
-      taskState.plannerRetryCount++;
-      if (taskState.plannerRetryCount <= this.config.maxPlannerRetries) {
-        const retryContext = this.buildContext('planRetry', context, taskState);
+      const retryCount = taskState.incrementRetryCount(AgentPhase.PLAN);
+      if (retryCount <= this.config.maxPlannerRetries) {
+        const retryContext = StateUtils.buildRetryContext(AgentPhase.PLAN, retryCount, context);
         return this.executePlanPhase(retryContext, taskState);
       }
       return TaskStatus.FAILED;
@@ -181,7 +159,7 @@ export class AgentOrchestrator extends EventEmitter {
 
       taskState.lastActionTaken = actionContent;
       taskState.lastActionResult = actionContent;
-      taskState.actorSummary = response.data?.summary || '';
+      taskState.addAgentSummary(response.data?.summary || '', AgentPhase.ACTION);
 
       this.emit('actionCompleted', { action: taskState.lastActionTaken, result: taskState.lastActionResult });
       return TaskStatus.IN_PROGRESS;
@@ -203,15 +181,15 @@ export class AgentOrchestrator extends EventEmitter {
       const decision = response.decision || this.parseEvaluationDecision(evalContent);
       
       taskState.lastEvalDecision = decision;
-      taskState.evaluatorSummary = response.data?.summary || '';
+      taskState.addAgentSummary(response.data?.summary || '', AgentPhase.EVALUATE);
 
       this.emit('evaluationCompleted', { decision, evaluation: evalContent });
 
       return this.handleEvaluationDecision(decision, context, taskState);
 
     } catch (error) {
-      taskState.evalRetryCount++;
-      if (taskState.evalRetryCount <= this.config.maxEvalRetries) {
+      const retryCount = taskState.incrementRetryCount(AgentPhase.EVALUATE);
+      if (retryCount <= this.config.maxEvalRetries) {
         return this.executeEvaluationPhase(context, taskState);
       }
       return { status: TaskStatus.FAILED, nextContext: context };
@@ -252,7 +230,7 @@ export class AgentOrchestrator extends EventEmitter {
         if (taskState.plannerSummary) context += `\n\nPlanner's Summary: ${taskState.plannerSummary}`;
         if (taskState.userClarification) {
           context += `\n\nContext: User responded '${taskState.userClarification}' to my last question.`;
-          taskState.userClarification = '';
+          taskState.clearUserClarification();
         }
         return context;
 
@@ -260,9 +238,8 @@ export class AgentOrchestrator extends EventEmitter {
         return `User's original request: '${prompt}'\n\nCurrent Plan Checklist:\n${taskState.currentPlan}\n\nInstruction that was attempted: '${taskState.currentInstruction}'\n\nAction Taken:\n${taskState.lastActionTaken}\n\nResult:\n${taskState.lastActionResult}`;
 
       case 'planRetry':
-        return taskState.plannerRetryCount === 1 
-          ? `${prompt}\n\nIMPORTANT: Your previous response did not include a proper <instruction> section. You MUST provide both a <checklist> (plan steps) AND an <instruction> (next action) in your response.`
-          : `${prompt}\n\nCRITICAL (Retry ${taskState.plannerRetryCount}): You must include BOTH sections: 1. <checklist> with plan steps 2. <instruction> with specific action to take`;
+        const retryCount = taskState.getRetryCount(AgentPhase.PLAN);
+        return StateUtils.buildRetryContext(AgentPhase.PLAN, retryCount, prompt);
 
       case 'continue':
         return `Continue with the next step in the plan:\n${taskState.currentPlan}\n\nCompleted step: ${taskState.currentInstruction}`;
@@ -276,13 +253,14 @@ export class AgentOrchestrator extends EventEmitter {
   }
 
   private shouldPlan(taskState: TaskState): boolean {
-    return !taskState.currentPlan || taskState.lastEvalDecision === 'REVISE_PLAN';
+    return taskState.needsNewPlan();
   }
 
   private async handleMissingInstruction(userPrompt: string, taskState: TaskState): Promise<TaskStatus> {
-    if (taskState.plannerRetryCount < this.config.maxPlannerRetries) {
-      taskState.plannerRetryCount++;
-      const retryContext = this.buildContext('planRetry', userPrompt, taskState);
+    const retryCount = taskState.getRetryCount(AgentPhase.PLAN);
+    if (retryCount < this.config.maxPlannerRetries) {
+      taskState.incrementRetryCount(AgentPhase.PLAN);
+      const retryContext = StateUtils.buildRetryContext(AgentPhase.PLAN, retryCount + 1, userPrompt);
       return this.executePlanPhase(retryContext, taskState);
     } else {
       return TaskStatus.FAILED;
@@ -325,41 +303,17 @@ export class AgentOrchestrator extends EventEmitter {
   private resetForNextInstruction(taskState: TaskState): void {
     taskState.stepIndex++;
     taskState.currentInstruction = taskState.planArray[taskState.stepIndex] || '';
-    taskState.actionRetryCount = 0;
+    taskState.resetRetryCount(AgentPhase.ACTION);
   }
 
   private resetForPlanRevision(taskState: TaskState): void {
-    taskState.currentPlan = '';
-    taskState.planArray = [];
-    taskState.stepIndex = 0;
-    taskState.currentInstruction = '';
-    taskState.plannerRetryCount = 0;
+    taskState.resetForPlanRevision();
   }
 
   private parsePlanArray(plan: string): string[] {
     return plan.split('\n')
       .map(line => line.trim())
       .filter(line => line.length > 0 && !line.startsWith('#'));
-  }
-
-  private createInitialTaskState(): TaskState {
-    return {
-      currentPlan: '',
-      currentInstruction: '',
-      planArray: [],
-      stepIndex: 0,
-      lastActionTaken: '',
-      lastActionResult: '',
-      userClarification: '',
-      lastEvalDecision: '',
-      iteration: 0,
-      plannerSummary: '',
-      actorSummary: '',
-      evaluatorSummary: '',
-      plannerRetryCount: 0,
-      actionRetryCount: 0,
-      evalRetryCount: 0
-    };
   }
 
   private getTaskResultMessage(status: TaskStatus): string {

@@ -27,11 +27,21 @@ export {
   type EvaluationDecisionType
 } from './evaluator.js';
 
+// Agent state management
+export {
+  TaskState,
+  StateManager,
+  StateUtils,
+  TaskStatus,
+  AgentPhase,
+  DecisionType,
+  type AgentSummary,
+  type StateSnapshot
+} from './state.js';
+
 // Agent orchestration
 export {
   AgentOrchestrator,
-  TaskStatus,
-  type TaskState,
   type OrchestratorConfig,
   type TaskResult
 } from './orchestrator.js';
