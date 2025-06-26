@@ -3,7 +3,7 @@
 import React from 'react';
 import { render } from 'ink';
 import { Command } from 'commander';
-import { App } from './ui/App.js';
+import App from './ui/App.js';
 import { CLIOptions } from './types.js';
 
 const program = new Command();

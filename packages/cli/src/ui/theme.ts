@@ -2,15 +2,21 @@ export interface Theme {
   colors: {
     primary: string;
     secondary: string;
-    accent: string;
     success: string;
     warning: string;
     error: string;
     info: string;
-    dim: string;
-    border: string;
-    background: string;
+    muted: string;
     text: string;
+    background: string;
+  };
+  borders: {
+    style: 'single' | 'double' | 'round' | 'bold';
+    colors: {
+      default: string;
+      active: string;
+      inactive: string;
+    };
   };
   spacing: {
     small: number;
@@ -19,23 +25,37 @@ export interface Theme {
   };
 }
 
-export const theme: Theme = {
+export const defaultTheme: Theme = {
   colors: {
-    primary: '#00D2FF',
-    secondary: '#3F8FFF', 
-    accent: '#FFB900',
-    success: '#13CE66',
-    warning: '#FF9500',
-    error: '#FF4757',
-    info: '#5DADE2',
-    dim: '#6C7B7F',
-    border: '#34495E',
-    background: '#1E1E1E',
-    text: '#FFFFFF',
+    primary: 'blue',
+    secondary: 'cyan',
+    success: 'green',
+    warning: 'yellow',
+    error: 'red',
+    info: 'blue',
+    muted: 'gray',
+    text: 'white',
+    background: 'black',
+  },
+  borders: {
+    style: 'single',
+    colors: {
+      default: 'gray',
+      active: 'blue',
+      inactive: 'dim',
+    },
   },
   spacing: {
     small: 1,
     medium: 2,
     large: 3,
   },
+};
+
+export const getThemeColor = (colorName: keyof Theme['colors']): string => {
+  return defaultTheme.colors[colorName];
+};
+
+export const getBorderStyle = (): 'single' | 'double' | 'round' | 'bold' => {
+  return defaultTheme.borders.style;
 };
