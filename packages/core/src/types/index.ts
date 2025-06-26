@@ -27,6 +27,37 @@ export interface AgentEvent {
   agentId: string;
 }
 
+// Enhanced Agent types
+export type AgentType = 'plan' | 'action' | 'evaluation';
+
+export interface BaseAgentInterface {
+  id: string;
+  type: AgentType;
+  execute(input: AgentInput): Promise<AgentResponse>;
+  reset(): void;
+}
+
+export interface AgentInput {
+  context: AgentContext;
+  config: CoreConfig;
+  prompt: string;
+}
+
+export interface AgentState {
+  isActive: boolean;
+  lastExecution?: number;
+  errorCount: number;
+  currentPhase: AgentPhase;
+}
+
+// Decision types from Python codebase
+export type AgentDecision = 
+  | 'CONTINUE_PLAN'
+  | 'REVISE_PLAN'
+  | 'TASK_COMPLETE'
+  | 'TASK_FAILED'
+  | 'CLARIFY_USER';
+
 // LLM-related types
 export interface LLMChunk {
   text: string;
@@ -49,6 +80,34 @@ export interface LLMClient {
   stream(prompt: string): AsyncIterable<LLMChunk>;
   generate(prompt: string): Promise<LLMResponse>;
   getContextLimit(): number;
+}
+
+// Enhanced LLM types
+export type LLMProvider = 'ollama' | 'openai' | 'anthropic' | 'custom';
+
+export interface LLMRequest {
+  prompt: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  stream?: boolean;
+  system?: string;
+}
+
+export interface LLMError {
+  code: string;
+  message: string;
+  retryable: boolean;
+  timestamp: number;
+}
+
+export interface LLMProviderConfig {
+  type: LLMProvider;
+  endpoint: string;
+  apiKey?: string;
+  model: string;
+  timeout: number;
+  retries: number;
 }
 
 // Configuration types
@@ -81,6 +140,28 @@ export interface CoreConfig {
   };
 }
 
+// Enhanced Configuration types from Python codebase
+export type OperationMode = 'normal' | 'gremlin' | 'goblin';
+
+export interface ConfigurationOptions {
+  endpoint: string;
+  apiKey?: string;
+  operationMode: OperationMode;
+  commandTimeout: number;
+  enableDebug: boolean;
+  allowClarifyingQuestions: boolean;
+  allowedCommands: Record<string, string>;
+  blacklistedCommands: string[];
+  llm: LLMProviderConfig;
+}
+
+export interface CommandPermissions {
+  whitelist: Record<string, string>;
+  blacklist: string[];
+  mode: OperationMode;
+  autoApprove: boolean;
+}
+
 // Communication types
 export interface Message {
   id: string;
@@ -93,6 +174,33 @@ export interface StreamEvent {
   type: string;
   data: any;
   timestamp: number;
+}
+
+// Enhanced Streaming types
+export type StreamEventType = 
+  | 'agent_start'
+  | 'agent_thinking' 
+  | 'agent_response'
+  | 'command_start'
+  | 'command_output'
+  | 'command_complete'
+  | 'task_progress'
+  | 'error'
+  | 'system';
+
+export interface EventEmitter<T = any> {
+  emit(event: string, data: T): void;
+  on(event: string, listener: (data: T) => void): void;
+  off(event: string, listener: (data: T) => void): void;
+  once(event: string, listener: (data: T) => void): void;
+}
+
+export interface StreamState {
+  isStreaming: boolean;
+  activeAgent?: AgentType;
+  progress: number;
+  startTime?: number;
+  lastEvent?: StreamEvent;
 }
 
 // Command execution types
@@ -108,6 +216,22 @@ export interface CommandPermission {
   command: string;
   allowed: boolean;
   reason?: string;
+}
+
+// Enhanced Command types
+export interface CommandExecution {
+  command: string;
+  startTime: number;
+  endTime?: number;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'timeout';
+  result?: CommandResult;
+}
+
+export interface SafetyCheck {
+  command: string;
+  safe: boolean;
+  reason?: string;
+  warnings: string[];
 }
 
 // Task and state types
@@ -137,4 +261,41 @@ export enum AgentPhase {
   PLAN = 'plan',
   ACTION = 'action',
   EVALUATE = 'evaluate',
+}
+
+// Enhanced Task Management types
+export interface TaskDefinition {
+  id: string;
+  description: string;
+  mode: OperationMode;
+  config: Partial<ConfigurationOptions>;
+  createdAt: number;
+}
+
+export interface TaskExecution {
+  id: string;
+  taskId: string;
+  status: TaskStatus;
+  state: TaskState;
+  agentState: Record<AgentType, AgentState>;
+  events: StreamEvent[];
+  startTime: number;
+  endTime?: number;
+  result?: TaskResult;
+}
+
+export interface TaskResult {
+  success: boolean;
+  finalState: TaskState;
+  executionTime: number;
+  commandsExecuted: CommandExecution[];
+  error?: string;
+  summary: string;
+}
+
+export interface TaskContext {
+  execution: TaskExecution;
+  config: ConfigurationOptions;
+  llmClient: LLMClient;
+  eventEmitter: EventEmitter;
 }

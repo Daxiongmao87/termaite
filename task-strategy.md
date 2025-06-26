@@ -1,33 +1,75 @@
-# Task Strategy: Implement Simple Response Mode as Default
+# Task Strategy: 1.3.1 Define Core Type System
 
-## User Request Summary
-The user wants to change termaite's default behavior from agentic mode (Plan-Act-Evaluate loop) to a simple response mode that:
-1. Only responds to prompts with messages and optionally commands when requested
-2. Requires explicit `-a` (agentic mode) or `-t` (task) flags to enable the full multi-agent architecture
-3. Examples:
-   - `termaite 'take me to my home directory'` → Should respond with message + command
-   - `termaite 'whats the best programming language'` → Should respond with just message (no command)
+## Objective
+Create comprehensive TypeScript type definitions for the core package that will support the multi-agent architecture, LLM integration, configuration management, and streaming infrastructure.
 
-## Current State Analysis
-- Currently, termaite defaults to full agentic mode (Plan-Act-Evaluate loop) for all prompts
-- CLI parser in `termaite/cli.py` has basic argument parsing but no mode flags
-- Task handler in `termaite/core/task_handler.py` always uses full agent loop
-- Application in `termaite/core/application.py` always calls task handler
+## Analysis of Requirements
+Based on the Python codebase and existing CLI types, I need to define:
+
+1. **Agent Event Types** - Communication between agents
+2. **Agent Response Types** - Structured outputs from agents
+3. **LLM Types** - Communication with language models
+4. **Configuration Types** - System and user configuration
+5. **Streaming Types** - Real-time event streaming
 
 ## Implementation Plan
 
-### Step 1: Update CLI Parser
-**File**: `termaite/cli.py`
-- Add `-a`/`--agentic` flag for agentic mode
-- Add `-t`/`--task` flag for task mode (alias for agentic)
-- Modify argument parsing to determine mode
-- Update help text and examples
+### Step 1: Create Core Type System File
+- File: `packages/core/src/types.ts`
+- Define all core interfaces and types
+- Ensure compatibility with existing CLI types
+- Follow TypeScript best practices
 
-### Step 2: Create Simple Response Handler
-**File**: `termaite/core/simple_handler.py` (new file)
-- Create new `SimpleHandler` class
-- Implement single LLM call for simple responses
-- Handle both message-only and message+command responses
+### Step 2: Categories of Types to Define
+
+#### Agent System Types
+- `BaseAgentInterface` - Common agent contract
+- `AgentType` - Plan, Action, Evaluation agents
+- `AgentState` - Current execution state
+- `AgentEvent` - Messages between agents
+- `AgentResponse` - Structured agent outputs
+- `AgentContext` - Execution context for agents
+
+#### LLM Integration Types
+- `LLMProvider` - Different LLM providers (Ollama, OpenAI, etc.)
+- `LLMRequest` - Structured request to LLM
+- `LLMResponse` - Complete LLM response
+- `LLMChunk` - Streaming response chunks
+- `LLMError` - Error handling for LLM failures
+
+#### Configuration Types
+- `ConfigurationOptions` - User configuration structure
+- `OperationMode` - normal/gremlin/goblin modes
+- `CommandPermissions` - Whitelist/blacklist configuration
+- `LLMConfig` - LLM endpoint and model configuration
+
+#### Streaming Infrastructure Types
+- `StreamEvent` - Events for real-time updates
+- `StreamEventType` - Types of streaming events
+- `EventEmitter` - Event emission interface
+- `StreamState` - Current streaming state
+
+#### Task Management Types
+- `TaskDefinition` - User-defined tasks
+- `TaskExecution` - Running task state
+- `TaskResult` - Execution outcomes
+- `TaskContext` - Environment and state for task execution
+
+### Step 3: Validation
+- Ensure types compile without errors
+- Verify compatibility with existing CLI types
+- Test type safety and intellisense
+- Check integration potential with future modules
+
+## Files to Create/Modify
+- `packages/core/src/types.ts` (new file)
+
+## Success Criteria
+- All types defined and documented
+- TypeScript compilation succeeds
+- Types are extensible for future features
+- Compatible with existing CLI interfaces
+- Supports the three-agent architecture from Python codebase
 - Use simpler prompt templates for non-agentic mode
 
 ### Step 3: Update Application Layer
