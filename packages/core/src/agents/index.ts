@@ -21,5 +21,11 @@ export {
   type ActionResponse
 } from './actor.js';
 
+export {
+  EvaluationAgent,
+  type EvaluationResponse,
+  type EvaluationDecisionType
+} from './evaluator.js';
+
 // Re-export base types for convenience
 export type { AgentContext, AgentResponse, AgentEvent, AgentType, AgentDecision } from '../types/index.js';
