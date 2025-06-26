@@ -27,5 +27,14 @@ export {
   type EvaluationDecisionType
 } from './evaluator.js';
 
+// Agent orchestration
+export {
+  AgentOrchestrator,
+  TaskStatus,
+  type TaskState,
+  type OrchestratorConfig,
+  type TaskResult
+} from './orchestrator.js';
+
 // Re-export base types for convenience
 export type { AgentContext, AgentResponse, AgentEvent, AgentType, AgentDecision } from '../types/index.js';
