@@ -16,5 +16,10 @@ export {
   type PlanResponse
 } from './planner.js';
 
+export {
+  ActionAgent,
+  type ActionResponse
+} from './actor.js';
+
 // Re-export base types for convenience
 export type { AgentContext, AgentResponse, AgentEvent, AgentType, AgentDecision } from '../types/index.js';
