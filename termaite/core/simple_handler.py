@@ -14,20 +14,25 @@ from .context_compactor import create_context_compactor
 class SimpleHandler:
     """Handles simple, direct responses without the Plan-Act-Evaluate loop."""
     
-    def __init__(self, config: Dict[str, Any], config_manager):
+    def __init__(self, config: Dict[str, Any], config_manager, initial_working_directory: Optional[str] = None):
         """Initialize the simple handler.
         
         Args:
             config: Application configuration
             config_manager: Configuration manager instance
+            initial_working_directory: The working directory where the application was started
         """
         self.config = config
         self.config_manager = config_manager
+        self.initial_working_directory = initial_working_directory
         
         # Initialize components
         self.llm_client = create_llm_client(config, config_manager)
-        self.payload_builder = create_payload_builder(config, config_manager.payload_file)
-        self.command_executor = create_command_executor(config.get("command_timeout", 30))
+        self.payload_builder = create_payload_builder(config, config_manager.payload_file, initial_working_directory)
+        self.command_executor = create_command_executor(
+            config.get("command_timeout", 30),
+            working_directory=initial_working_directory
+        )
         self.permission_manager = create_permission_manager(config_manager.config_file)
         self.safety_checker = create_safety_checker()
         self.context_compactor = create_context_compactor(config, config_manager)
@@ -212,14 +217,15 @@ Please explain what went wrong and suggest possible solutions."""
         return False
 
 
-def create_simple_handler(config: Dict[str, Any], config_manager) -> SimpleHandler:
+def create_simple_handler(config: Dict[str, Any], config_manager, initial_working_directory: Optional[str] = None) -> SimpleHandler:
     """Create and initialize a SimpleHandler instance.
     
     Args:
         config: Application configuration
         config_manager: Configuration manager instance
+        initial_working_directory: The working directory where the application was started
         
     Returns:
         Initialized SimpleHandler instance
     """
-    return SimpleHandler(config, config_manager)
+    return SimpleHandler(config, config_manager, initial_working_directory)

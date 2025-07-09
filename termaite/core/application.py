@@ -3,6 +3,7 @@
 import signal
 import shutil
 import sys
+import os
 from typing import Optional
 from pathlib import Path
 
@@ -17,13 +18,17 @@ from ..constants import CLR_BOLD_RED, CLR_RESET
 class TermAIte:
     """Main application class for term.ai.te."""
     
-    def __init__(self, config_dir: Optional[str] = None, debug: bool = False):
+    def __init__(self, config_dir: Optional[str] = None, debug: bool = False, initial_working_directory: Optional[str] = None):
         """Initialize the termaite application.
         
         Args:
             config_dir: Custom configuration directory path
             debug: Enable debug logging
+            initial_working_directory: The working directory where the application was started
         """
+        # Store the initial working directory
+        self.initial_working_directory = initial_working_directory or os.getcwd()
+        
         # Set up logging first
         logger.set_debug(debug)
         
@@ -41,9 +46,9 @@ class TermAIte:
         # Check dependencies
         check_dependencies()
         
-        # Initialize task handler and simple handler
-        self.task_handler = create_task_handler(self.config, self.config_manager)
-        self.simple_handler = create_simple_handler(self.config, self.config_manager)
+        # Initialize task handler and simple handler with initial working directory
+        self.task_handler = create_task_handler(self.config, self.config_manager, self.initial_working_directory)
+        self.simple_handler = create_simple_handler(self.config, self.config_manager, self.initial_working_directory)
         
         # Set up signal handlers
         self._setup_signal_handlers()
@@ -245,14 +250,15 @@ class TermAIte:
         except Exception as e:
             logger.error(f"Error opening editor: {e}")
 
-def create_application(config_dir: Optional[str] = None, debug: bool = False) -> TermAIte:
+def create_application(config_dir: Optional[str] = None, debug: bool = False, initial_working_directory: Optional[str] = None) -> TermAIte:
     """Create and initialize a TermAIte application instance.
     
     Args:
         config_dir: Custom configuration directory path
         debug: Enable debug logging
+        initial_working_directory: The working directory where the application was started
         
     Returns:
         Initialized TermAIte instance
     """
-    return TermAIte(config_dir, debug)
+    return TermAIte(config_dir, debug, initial_working_directory)

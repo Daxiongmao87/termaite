@@ -6,6 +6,7 @@ to understand natural language requests and execute shell commands safely throug
 multi-agent system (Plan, Action, Evaluation).
 """
 
+
 __version__ = "1.0.0"
 __author__ = "term.ai.te Team"
 

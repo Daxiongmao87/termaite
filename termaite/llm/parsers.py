@@ -8,7 +8,7 @@ from ..utils.logging import logger
 
 def parse_suggested_command(llm_output: str) -> Optional[str]:
     """Extract a suggested command from LLM output wrapped in ```agent_command``` tags."""
-    match = re.search(r"```agent_command\s*\n(.*?)\n```", llm_output, re.DOTALL)
+    match = re.search(r"```agent_command\s*(.*?)```", llm_output, re.DOTALL)
     return match.group(1).strip() if match else None
 
 

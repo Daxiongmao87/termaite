@@ -55,20 +55,25 @@ class TaskState:
 class TaskHandler:
     """Handles task execution through the Plan-Act-Evaluate loop."""
     
-    def __init__(self, config: Dict[str, Any], config_manager):
+    def __init__(self, config: Dict[str, Any], config_manager, initial_working_directory: Optional[str] = None):
         """Initialize the task handler.
         
         Args:
             config: Application configuration
             config_manager: Configuration manager instance
+            initial_working_directory: The working directory where the application was started
         """
         self.config = config
         self.config_manager = config_manager
+        self.initial_working_directory = initial_working_directory
         
         # Initialize components
         self.llm_client = create_llm_client(config, config_manager)
-        self.payload_builder = create_payload_builder(config, config_manager.payload_file)
-        self.command_executor = create_command_executor(config.get("command_timeout", 30))
+        self.payload_builder = create_payload_builder(config, config_manager.payload_file, initial_working_directory)
+        self.command_executor = create_command_executor(
+            config.get("command_timeout", 30),
+            working_directory=initial_working_directory
+        )
         self.permission_manager = create_permission_manager(config_manager.config_file)
         self.safety_checker = create_safety_checker()
         self.context_compactor = create_context_compactor(config, config_manager)
@@ -245,7 +250,11 @@ class TaskHandler:
         if suggested_command:
             return self._handle_command_suggestion(suggested_command, state)
         else:
-            return self._handle_text_response(response, thought, state)
+            # Action agent should ALWAYS provide a command, never text responses
+            logger.error(f"Action agent failed to provide a command. Response: {response}")
+            state.last_action_taken = "Action agent error: no command provided"
+            state.last_action_result = f"Action agent response contained no ```agent_command``` block: {response}"
+            return TaskStatus.FAILED
     
     def _handle_command_suggestion(self, command: str, state: TaskState) -> TaskStatus:
         """Handle a command suggestion from the action agent."""
@@ -300,33 +309,6 @@ class TaskHandler:
         
         return TaskStatus.IN_PROGRESS
     
-    def _handle_text_response(self, response: str, thought: str, state: TaskState) -> TaskStatus:
-        """Handle a text response (question/statement) from the action agent."""
-        import re
-        
-        # Extract the actual response text (removing all think tags)
-        text_response = re.sub(r'<think>.*?</think>', '', response, flags=re.DOTALL).strip()
-        
-        if not text_response:
-            logger.warning("Actor: no command and no textual response/question")
-            state.last_action_taken = "Actor: no command and no question"
-            state.last_action_result = f"Actor LLM response empty or only thought: {response}"
-            return TaskStatus.IN_PROGRESS
-        
-        if self.config.get("allow_clarifying_questions", True):
-            logger.action_agent(f"[Actor Question/Statement]: {text_response}")
-            # Clean output consistent with established standards
-            print(f"\n{CLR_BOLD_GREEN}{text_response}{CLR_RESET}")
-            print(f"{CLR_GREEN}Response: {CLR_RESET}", end="")
-            state.user_clarification = input()
-            state.last_action_taken = f"Action Agent asked/stated: {text_response}"
-            state.last_action_result = f"User responded: {state.user_clarification}"
-            return TaskStatus.IN_PROGRESS
-        else:
-            logger.warning(f"Actor: no command, questions disabled. Actor said: {text_response}")
-            state.last_action_taken = f"Actor: no command (questions disabled). Statement: {text_response}"
-            state.last_action_result = "No action taken: no command, questions disabled"
-            return TaskStatus.IN_PROGRESS
     
     def _execute_evaluation_phase(self, context: str, state: TaskState) -> tuple[TaskStatus, str]:
         """Execute the evaluation phase."""
@@ -528,14 +510,15 @@ class TaskHandler:
             print(f"\n## Task Completion Summary\n{response}\n")
 
 
-def create_task_handler(config: Dict[str, Any], config_manager) -> TaskHandler:
+def create_task_handler(config: Dict[str, Any], config_manager, initial_working_directory: Optional[str] = None) -> TaskHandler:
     """Create a task handler instance.
     
     Args:
         config: Application configuration
         config_manager: Configuration manager instance
+        initial_working_directory: The working directory where the application was started
         
     Returns:
         TaskHandler instance
     """
-    return TaskHandler(config, config_manager)
+    return TaskHandler(config, config_manager, initial_working_directory)

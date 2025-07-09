@@ -2,6 +2,7 @@
 
 import argparse
 import sys
+import os
 from typing import List, Optional
 
 from colorama import init as colorama_init
@@ -101,6 +102,15 @@ Operation Modes:
 
 def main(args: Optional[List[str]] = None) -> None:
     """Main entry point for the CLI."""
+    # Capture the initial working directory before anything else
+    # The Python process may start in the package directory due to editable install
+    # Try to get the actual user directory from various sources
+    initial_working_directory = (
+        os.environ.get('TERMAITE_PWD') or  # User can set this explicitly
+        os.environ.get('PWD') or           # Shell working directory
+        os.getcwd()                        # Fallback to Python's directory
+    )
+    
     # Initialize colorama for cross-platform colored output
     colorama_init(autoreset=True)
     
@@ -115,7 +125,8 @@ def main(args: Optional[List[str]] = None) -> None:
         
         app = create_application(
             config_dir=parsed_args.config_dir,
-            debug=parsed_args.debug
+            debug=parsed_args.debug,
+            initial_working_directory=initial_working_directory
         )
     except SystemExit:
         # Configuration setup was needed - already handled

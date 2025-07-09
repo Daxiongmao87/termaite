@@ -14,17 +14,19 @@ from ..constants import DEFAULT_MODEL
 class PayloadBuilder:
     """Builds JSON payloads for LLM API calls."""
     
-    def __init__(self, config: Dict[str, Any], payload_file: Path):
+    def __init__(self, config: Dict[str, Any], payload_file: Path, working_directory: Optional[str] = None):
         """Initialize payload builder.
         
         Args:
             config: Application configuration
             payload_file: Path to payload template file
+            working_directory: Working directory for context
         """
         self.config = config
         self.payload_file = payload_file
         self.allowed_commands = {}
         self.blacklisted_commands = {}
+        self.working_directory = working_directory
     
     def set_command_maps(self, allowed: Dict[str, str], blacklisted: Dict[str, Any]):
         """Set command allow/blacklists for payload building."""
@@ -46,7 +48,7 @@ class PayloadBuilder:
             return None
         
         # Process template variables
-        context_vars = get_current_context()
+        context_vars = get_current_context(self.working_directory)
         context_vars["tool_instructions_addendum"] = self._get_tool_instructions(phase)
         
         # Handle conditional blocks in prompts
@@ -198,6 +200,6 @@ class PayloadBuilder:
             return None
 
 
-def create_payload_builder(config: Dict[str, Any], payload_file: Path) -> PayloadBuilder:
+def create_payload_builder(config: Dict[str, Any], payload_file: Path, working_directory: Optional[str] = None) -> PayloadBuilder:
     """Create a configured payload builder instance."""
-    return PayloadBuilder(config, payload_file)
+    return PayloadBuilder(config, payload_file, working_directory)

@@ -1,6 +1,7 @@
 """Command execution utilities for termaite."""
 
 import subprocess
+import os
 from typing import Optional, Tuple
 from pathlib import Path
 
@@ -44,13 +45,15 @@ class CommandResult:
 class CommandExecutor:
     """Executes shell commands with timeout and error handling."""
     
-    def __init__(self, default_timeout: int = 30):
+    def __init__(self, default_timeout: int = 30, working_directory: Optional[str] = None):
         """Initialize command executor.
         
         Args:
             default_timeout: Default timeout for command execution in seconds
+            working_directory: Working directory for command execution (defaults to current working directory when app started)
         """
         self.default_timeout = default_timeout
+        self.working_directory = working_directory or os.getcwd()
     
     def execute(self, command: str, timeout: Optional[int] = None, quiet: bool = False) -> CommandResult:
         """Execute a shell command with timeout and error handling.
@@ -75,7 +78,8 @@ class CommandExecutor:
                 shell=True, 
                 capture_output=True, 
                 text=True,
-                timeout=timeout
+                timeout=timeout,
+                cwd=self.working_directory
             )
             
             result = CommandResult(
@@ -154,6 +158,6 @@ class CommandExecutor:
         return result.success and result.stdout.strip() != ""
 
 
-def create_command_executor(timeout: int = 30) -> CommandExecutor:
+def create_command_executor(timeout: int = 30, working_directory: Optional[str] = None) -> CommandExecutor:
     """Create a command executor with the specified default timeout."""
-    return CommandExecutor(timeout)
+    return CommandExecutor(timeout, working_directory)

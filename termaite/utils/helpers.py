@@ -63,11 +63,11 @@ def get_nested_value(data: Dict[str, Any], path: str, default: Any = None) -> An
     return current
 
 
-def get_current_context() -> Dict[str, str]:
+def get_current_context(working_directory: str = None) -> Dict[str, str]:
     """Get current system context (time, directory, hostname)."""
     return {
         'current_time': get_current_timestamp(),
-        'current_directory': os.getcwd(),
+        'current_directory': working_directory or os.getcwd(),
         'current_hostname': os.uname().nodename
     }
 
