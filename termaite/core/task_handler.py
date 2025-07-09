@@ -1,6 +1,8 @@
 """Task handler with Plan-Act-Evaluate loop for termaite."""
 
 import re
+import os
+import hashlib
 from typing import Dict, Any, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
@@ -9,6 +11,7 @@ from ..utils.logging import logger
 from ..llm import create_llm_client, create_payload_builder, parse_llm_plan, parse_llm_instruction, parse_llm_decision, parse_llm_thought, parse_suggested_command, parse_llm_summary
 from ..commands import create_command_executor, create_permission_manager, create_safety_checker
 from ..constants import CLR_GREEN, CLR_RESET, CLR_BOLD_GREEN
+from .context_compactor import create_context_compactor
 
 
 class TaskStatus(Enum):
@@ -68,6 +71,7 @@ class TaskHandler:
         self.command_executor = create_command_executor(config.get("command_timeout", 30))
         self.permission_manager = create_permission_manager(config_manager.config_file)
         self.safety_checker = create_safety_checker()
+        self.context_compactor = create_context_compactor(config, config_manager)
         
         # Set command maps from config
         allowed_cmds, blacklisted_cmds = config_manager.get_command_maps()
@@ -89,6 +93,10 @@ class TaskHandler:
         state = TaskState()
         task_status = TaskStatus.IN_PROGRESS
         current_context = user_prompt
+        
+        # Check and compact context if needed
+        pwd_hash = hashlib.sha256(os.getcwd().encode('utf-8')).hexdigest()
+        self.context_compactor.check_and_compact_context(pwd_hash)
         
         # Main Plan-Act-Evaluate loop
         while task_status == TaskStatus.IN_PROGRESS:

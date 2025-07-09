@@ -15,7 +15,8 @@ import yaml
 from ..constants import (
     CONFIG_DIR, CONFIG_FILE, PAYLOAD_FILE, RESPONSE_PATH_FILE,
     DEFAULT_ENDPOINT, DEFAULT_COMMAND_TIMEOUT, DEFAULT_OPERATION_MODE,
-    DEFAULT_ENABLE_DEBUG, DEFAULT_ALLOW_CLARIFYING_QUESTIONS, OPERATION_MODES
+    DEFAULT_ENABLE_DEBUG, DEFAULT_ALLOW_CLARIFYING_QUESTIONS, OPERATION_MODES,
+    DEFAULT_MAX_CONTEXT_TOKENS, DEFAULT_COMPACTION_THRESHOLD
 )
 from ..utils.logging import logger
 from ..utils.helpers import get_current_context, format_template_string, safe_file_write
@@ -170,6 +171,19 @@ class ConfigManager:
             logger.warning(f"allow_clarifying_questions in {self.config_file} must be true/false. Defaulting to true.")
             allow_questions = DEFAULT_ALLOW_CLARIFYING_QUESTIONS
         config_data["allow_clarifying_questions"] = allow_questions
+
+        # Validate context management settings
+        max_context_tokens = config_data.get("max_context_tokens", DEFAULT_MAX_CONTEXT_TOKENS)
+        if not (isinstance(max_context_tokens, int) and max_context_tokens > 0):
+            logger.warning(f"max_context_tokens in {self.config_file} must be a positive integer. Defaulting to {DEFAULT_MAX_CONTEXT_TOKENS}.")
+            max_context_tokens = DEFAULT_MAX_CONTEXT_TOKENS
+        config_data["max_context_tokens"] = max_context_tokens
+
+        compaction_threshold = config_data.get("compaction_threshold", DEFAULT_COMPACTION_THRESHOLD)
+        if not (isinstance(compaction_threshold, (int, float)) and 0 < compaction_threshold < 1):
+            logger.warning(f"compaction_threshold in {self.config_file} must be between 0 and 1. Defaulting to {DEFAULT_COMPACTION_THRESHOLD}.")
+            compaction_threshold = DEFAULT_COMPACTION_THRESHOLD
+        config_data["compaction_threshold"] = compaction_threshold
 
         logger.debug(f"Configuration loaded successfully from {self.config_file}")
         return config_data

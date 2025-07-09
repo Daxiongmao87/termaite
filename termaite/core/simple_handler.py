@@ -1,11 +1,14 @@
 """Simple response handler for termaite - handles non-agentic mode responses."""
 
+import os
+import hashlib
 from typing import Dict, Any, Optional, Tuple
 
 from ..utils.logging import logger
 from ..llm import create_llm_client, create_payload_builder, parse_suggested_command, parse_llm_thought
 from ..commands import create_command_executor, create_permission_manager, create_safety_checker
 from ..constants import CLR_GREEN, CLR_RESET, CLR_BOLD_GREEN
+from .context_compactor import create_context_compactor
 
 
 class SimpleHandler:
@@ -27,6 +30,7 @@ class SimpleHandler:
         self.command_executor = create_command_executor(config.get("command_timeout", 30))
         self.permission_manager = create_permission_manager(config_manager.config_file)
         self.safety_checker = create_safety_checker()
+        self.context_compactor = create_context_compactor(config, config_manager)
         
         # Set command maps from config
         allowed_cmds, blacklisted_cmds = config_manager.get_command_maps()
@@ -44,6 +48,10 @@ class SimpleHandler:
         Returns:
             True if request handled successfully, False otherwise
         """
+        # Check and compact context if needed
+        pwd_hash = hashlib.sha256(os.getcwd().encode('utf-8')).hexdigest()
+        self.context_compactor.check_and_compact_context(pwd_hash)
+        
         # Get LLM response for simple mode
         payload = self.payload_builder.prepare_payload("simple", user_prompt)
         if not payload:

@@ -44,7 +44,39 @@ plan_prompt: |
   Time: {current_time}
   Directory: {current_directory}
   Hostname: {current_hostname}
-  Refer to your detailed directives for output format (using <checklist>, <instruction>, and <think> tags, or <decision>CLARIFY_USER</decision>).
+  
+  REQUIRED OUTPUT FORMAT:
+  You MUST respond using this exact format:
+  
+  <think>Your reasoning about the task and plan</think>
+  
+  <checklist>
+  1. First step description
+  2. Second step description  
+  3. Third step description
+  (etc. - create as many steps as needed)
+  </checklist>
+  
+  <instruction>
+  Detailed instruction for the FIRST step that the Actor should execute now
+  </instruction>
+  
+  EXAMPLES:
+  User: "Create a backup of my documents folder"
+  Response:
+  <think>I need to create a backup of the user's documents. This involves finding the documents folder, creating a backup location, and copying the files.</think>
+  
+  <checklist>
+  1. Locate the user's documents folder
+  2. Create a backup directory with timestamp
+  3. Copy all documents to the backup directory
+  4. Verify the backup was created successfully
+  </checklist>
+  
+  <instruction>
+  Check if the ~/Documents directory exists and list its contents to understand what needs to be backed up
+  </instruction>
+  
   {{{{if ALLOW_CLARIFYING_QUESTIONS}}}}
   If clarification is absolutely necessary, use <decision>CLARIFY_USER: Your question here</decision>.
   {{{{else}}}}
@@ -188,6 +220,10 @@ operation_mode: normal # Default operation mode
 command_timeout: 30 # Default timeout for commands in seconds
 enable_debug: false
 allow_clarifying_questions: true
+
+# Context management settings
+max_context_tokens: 20480 # Maximum context size in tokens before compaction
+compaction_threshold: 0.75 # Trigger compaction at 75% of max context size
 """
 
 PAYLOAD_TEMPLATE = """{
