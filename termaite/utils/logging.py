@@ -33,9 +33,9 @@ class Logger:
         self.level_map = {
             "System": (CLR_CYAN, CLR_BOLD_CYAN),
             "User": (CLR_GREEN, CLR_BOLD_GREEN),
-            "Plan Agent": (CLR_MAGENTA, CLR_BOLD_MAGENTA),
-            "Action Agent": (CLR_BLUE, CLR_BOLD_BLUE),
-            "Eval Agent": (CLR_YELLOW, CLR_BOLD_YELLOW),
+            "Planner": (CLR_MAGENTA, CLR_BOLD_MAGENTA),
+            "Actor": (CLR_BLUE, CLR_BOLD_BLUE),
+            "Evaluator": (CLR_YELLOW, CLR_BOLD_YELLOW),
             "LLM": (CLR_WHITE, CLR_BOLD_WHITE),
             "Command": (CLR_YELLOW, CLR_BOLD_YELLOW),
             "Error": (CLR_RED, CLR_BOLD_RED),
@@ -97,17 +97,30 @@ class Logger:
         """Log a user message."""
         self.log_message("User", message)
 
+    def planner(self, message: str) -> None:
+        """Log a planner agent message."""
+        self.log_message("Planner", message)
+
+    def actor(self, message: str) -> None:
+        """Log an actor agent message."""
+        self.log_message("Actor", message)
+
+    def evaluator(self, message: str) -> None:
+        """Log an evaluator agent message."""
+        self.log_message("Evaluator", message)
+
+    # Legacy method names for backward compatibility
     def plan_agent(self, message: str) -> None:
-        """Log a plan agent message."""
-        self.log_message("Plan Agent", message)
+        """Log a plan agent message (legacy)."""
+        self.planner(message)
 
     def action_agent(self, message: str) -> None:
-        """Log an action agent message."""
-        self.log_message("Action Agent", message)
+        """Log an action agent message (legacy)."""
+        self.actor(message)
 
     def eval_agent(self, message: str) -> None:
-        """Log an evaluation agent message."""
-        self.log_message("Eval Agent", message)
+        """Log an evaluation agent message (legacy)."""
+        self.evaluator(message)
 
     def llm(self, message: str) -> None:
         """Log an LLM-related message."""

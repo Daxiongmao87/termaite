@@ -25,6 +25,7 @@ Examples:
   termaite "take me to my home directory"           # Simple response with command
   termaite -a "create a backup of my documents"     # Agentic mode (multi-step)
   termaite --debug "find all large files over 100MB"
+  termaite --init                                   # Initialize project-specific prompts
   termaite  # Interactive mode
 
 Configuration:
@@ -93,6 +94,12 @@ Operation Modes:
         help="Open configuration file in system default editor",
     )
 
+    parser.add_argument(
+        "--init",
+        action="store_true",
+        help="Initialize project-specific agent prompts by investigating the current directory",
+    )
+
     return parser
 
 
@@ -145,6 +152,11 @@ def main(args: Optional[List[str]] = None) -> None:
     if parsed_args.edit_config:
         app.edit_config()
         return
+
+    # Handle project initialization request
+    if parsed_args.init:
+        success = app.initialize_project_prompts()
+        sys.exit(0 if success else 1)
 
     # Run in command-line or interactive mode
     if parsed_args.task_prompt:

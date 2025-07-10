@@ -66,7 +66,23 @@ class PayloadBuilder:
         return self._build_json_payload(final_system_prompt, prompt_content)
 
     def _get_system_prompt_for_phase(self, phase: str) -> Optional[str]:
-        """Get the system prompt for a specific phase."""
+        """Get the system prompt for a specific phase.
+
+        First checks for project-specific prompts in .termaite directory,
+        then falls back to default configuration prompts.
+        """
+        # Check for project-specific customized prompts first
+        if self.working_directory:
+            termaite_dir = Path(self.working_directory) / ".termaite"
+            if termaite_dir.exists():
+                customized_prompt = self._load_customized_prompt(phase, termaite_dir)
+                if customized_prompt:
+                    logger.debug(
+                        f"Using customized {phase} prompt from .termaite directory"
+                    )
+                    return customized_prompt
+
+        # Fall back to default configuration prompts
         phase_map = {
             "plan": self.config.get("plan_prompt", ""),
             "action": self.config.get("action_prompt", ""),
@@ -179,6 +195,40 @@ class PayloadBuilder:
             prompt = prompt.replace(marker, "")
 
         return prompt
+
+    def _load_customized_prompt(self, phase: str, termaite_dir: Path) -> Optional[str]:
+        """Load a customized prompt from the .termaite directory.
+
+        Args:
+            phase: The phase name (plan, action, evaluate, etc.)
+            termaite_dir: Path to the .termaite directory
+
+        Returns:
+            The customized prompt content or None if not found
+        """
+        # Map phase names to file names
+        phase_file_map = {
+            "plan": "PLANNER.md",
+            "action": "ACTOR.md",
+            "evaluate": "EVALUATOR.md",
+        }
+
+        if phase not in phase_file_map:
+            return None
+
+        prompt_file = termaite_dir / phase_file_map[phase]
+
+        try:
+            if prompt_file.exists():
+                with open(prompt_file, "r", encoding="utf-8") as f:
+                    content = f.read().strip()
+                if content:
+                    logger.debug(f"Loaded customized prompt from {prompt_file}")
+                    return content
+        except Exception as e:
+            logger.warning(f"Failed to load customized prompt from {prompt_file}: {e}")
+
+        return None
 
     def _build_json_payload(
         self, system_prompt: str, user_prompt: str

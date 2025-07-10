@@ -166,10 +166,11 @@ class SimpleHandler:
             )
             return False
 
-        permission_allowed, permission_reason = (
-            self.permission_manager.check_command_permission(
-                command, self.config.get("operation_mode", "normal")
-            )
+        (
+            permission_allowed,
+            permission_reason,
+        ) = self.permission_manager.check_command_permission(
+            command, self.config.get("operation_mode", "normal")
         )
         if not permission_allowed:
             logger.warning(f"Command not permitted: {permission_reason}")

@@ -320,10 +320,11 @@ class TaskHandler:
                     logger.system(f"Goblin Mode: Auto-allowing command")
                     allowed = True
                 else:  # gremlin mode
-                    decision, perm_reason = (
-                        self.permission_manager.prompt_for_permission(
-                            command, self.config, self.llm_client
-                        )
+                    (
+                        decision,
+                        perm_reason,
+                    ) = self.permission_manager.prompt_for_permission(
+                        command, self.config, self.llm_client
                     )
                     if decision == 0:
                         allowed = True

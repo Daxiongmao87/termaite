@@ -195,7 +195,12 @@ class TermAIte:
         logger.system(
             "Commands: -a <prompt> for agentic mode, -s <prompt> for simple mode"
         )
-        logger.system("Meta commands: /exit, /quit, /help, /history, /stats, /clear")
+        logger.system(
+            "Meta commands: /exit, /quit, /help, /history, /stats, /clear, /init"
+        )
+
+        # Show tip about /init if no .termaite folder exists
+        self._show_init_tip_if_needed()
 
         try:
             while True:
@@ -382,6 +387,7 @@ class TermAIte:
             logger.system("  /history - Show conversation history")
             logger.system("  /stats - Show session statistics")
             logger.system("  /clear - Clear conversation history")
+            logger.system("  /init - Initialize project-specific agent prompts")
             logger.system("  -a <prompt> - Use agentic mode for this prompt")
             logger.system("  -s <prompt> - Use simple mode for this prompt")
             return True
@@ -427,6 +433,15 @@ class TermAIte:
         elif command == "/clear":
             self._interactive_session.conversation_history.clear()
             logger.system("Conversation history cleared.")
+            return True
+
+        elif command == "/init":
+            logger.system("Starting project initialization...")
+            success = self.initialize_project_prompts()
+            if success:
+                logger.system("Project initialization completed successfully!")
+            else:
+                logger.error("Project initialization failed.")
             return True
 
         else:
@@ -523,6 +538,160 @@ class TermAIte:
             logger.system("Editor interrupted by user")
         except Exception as e:
             logger.error(f"Error opening editor: {e}")
+
+    def initialize_project_prompts(self) -> bool:
+        """Initialize project-specific agent prompts by investigating the current directory.
+
+        This method will:
+        1. Use an agent to investigate the current project thoroughly
+        2. Generate customized prompts for Planner, Actor, and Evaluator agents
+        3. Save these prompts to .termaite/ folder for future use
+
+        Returns:
+            True if initialization completed successfully, False otherwise
+        """
+        try:
+            # Create .termaite directory if it doesn't exist
+            termaite_dir = Path(self.initial_working_directory) / ".termaite"
+            termaite_dir.mkdir(exist_ok=True)
+            logger.system(f"Created/verified .termaite directory: {termaite_dir}")
+
+            # Step 1: Investigate the project
+            logger.system("🔍 Step 1: Investigating project directory...")
+            project_investigation_prompt = self._create_project_investigation_prompt()
+
+            # Use agentic mode to investigate the project
+            investigation_success = self.handle_task(
+                project_investigation_prompt, agentic_mode=True
+            )
+            if not investigation_success:
+                logger.error("Failed to investigate project directory")
+                return False
+
+            # For now, we'll need to capture the investigation results from the LLM
+            # This is a limitation we'll work around by asking for a summary
+
+            # Step 2: Generate Planner prompt
+            logger.system("📋 Step 2: Generating Planner prompt...")
+            planner_prompt = self._create_agent_customization_prompt(
+                "Planner", self.config.get("plan_prompt", ""), "planning phase"
+            )
+
+            planner_success = self.handle_task(planner_prompt, agentic_mode=True)
+            if not planner_success:
+                logger.error("Failed to generate Planner prompt")
+                return False
+
+            # Step 3: Generate Actor prompt
+            logger.system("⚡ Step 3: Generating Actor prompt...")
+            actor_prompt = self._create_agent_customization_prompt(
+                "Actor", self.config.get("action_prompt", ""), "action execution phase"
+            )
+
+            actor_success = self.handle_task(actor_prompt, agentic_mode=True)
+            if not actor_success:
+                logger.error("Failed to generate Actor prompt")
+                return False
+
+            # Step 4: Generate Evaluator prompt
+            logger.system("📊 Step 4: Generating Evaluator prompt...")
+            evaluator_prompt = self._create_agent_customization_prompt(
+                "Evaluator", self.config.get("evaluate_prompt", ""), "evaluation phase"
+            )
+
+            evaluator_success = self.handle_task(evaluator_prompt, agentic_mode=True)
+            if not evaluator_success:
+                logger.error("Failed to generate Evaluator prompt")
+                return False
+
+            logger.system("✅ Project initialization completed successfully!")
+            logger.system(
+                f"Project-specific prompts have been saved to: {termaite_dir}"
+            )
+            logger.system(
+                "These will be automatically used for future operations in this directory."
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Error during project initialization: {e}")
+            return False
+
+    def _create_project_investigation_prompt(self) -> str:
+        """Create a prompt for investigating the current project."""
+        return f"""I need you to investigate this project directory thoroughly to understand what type of project this is.
+
+Please examine the current directory structure, file types, content samples, configuration files, documentation, and any other relevant information to determine:
+
+1. What type of project this is (e.g., software project, novel/book, research paper, business documents, game, website, etc.)
+2. What domain or field it relates to
+3. What the primary goals and purposes of this project appear to be
+4. What tools, technologies, or methodologies are being used
+5. What patterns and conventions are followed
+
+Please be thorough in your investigation. Look at:
+- Directory structure and organization
+- File extensions and types present
+- README files or documentation
+- Configuration files
+- Sample content from key files
+- Any build files, package files, or project metadata
+- Version control information if present
+
+Start by listing the contents of the current directory, then dive deeper into the most relevant subdirectories and files to understand the project's nature and purpose.
+
+Current directory: {self.initial_working_directory}
+
+Be comprehensive but practical in your investigation - we want to understand this project well enough to customize AI agents to work effectively within its context."""
+
+    def _create_agent_customization_prompt(
+        self, agent_name: str, current_prompt: str, phase_description: str
+    ) -> str:
+        """Create a prompt for customizing a specific agent's system prompt."""
+        return f"""Based on your investigation of this project, I need you to enhance the {agent_name} agent's system prompt to be specifically tailored for this type of project.
+
+Current {agent_name} system prompt:
+---
+{current_prompt}
+---
+
+Your task is to append project-specific role instructions to this prompt that will help the {agent_name} agent understand:
+
+1. The specific domain/field this project operates in
+2. Common patterns, conventions, and best practices for this type of project
+3. Relevant tools, technologies, or methodologies specific to this project type
+4. Domain-specific terminology and concepts the agent should be aware of
+5. Common tasks and workflows specific to this project type
+6. Any special considerations or constraints for working with this type of project
+
+Please provide the enhanced prompt with the additional role instructions appended. The enhanced prompt should:
+- Keep all the original functionality and formatting requirements
+- Add specific domain knowledge relevant to this project type
+- Include guidance on project-specific best practices
+- Help the agent make more informed decisions for this particular domain
+
+Write the enhanced prompt and save it to .termaite/{agent_name.upper()}.md
+
+The enhanced prompt should make the {agent_name} agent much more effective when working on {phase_description} tasks for this specific type of project."""
+
+    def _show_init_tip_if_needed(self) -> None:
+        """Show a tip about the /init command if no .termaite folder exists."""
+        termaite_dir = Path(self.initial_working_directory) / ".termaite"
+
+        if not termaite_dir.exists():
+            logger.system("")
+            logger.system("💡 Tip: You're in a new project directory!")
+            logger.system(
+                "   Consider running '/init' to let the AI agents investigate"
+            )
+            logger.system(
+                "   this project and customize themselves for better performance."
+            )
+            logger.system(
+                "   This creates project-specific agent prompts in .termaite/"
+            )
+            logger.system("")
 
 
 def create_application(
