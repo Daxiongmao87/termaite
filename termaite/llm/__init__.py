@@ -11,7 +11,7 @@ from .parsers import (
     parse_llm_summary,
     extract_decision_type_and_message,
     parse_checklist_items,
-    extract_response_content
+    extract_response_content,
 )
 
 __all__ = [

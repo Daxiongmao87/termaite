@@ -12,7 +12,7 @@ from ..utils.logging import logger
 
 def get_current_timestamp() -> str:
     """Returns the current timestamp in YYYY-MM-DD HH:MM:SS format."""
-    return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def check_dependencies() -> None:
@@ -25,26 +25,28 @@ def check_dependencies() -> None:
     # CLI tools that might be used by `subprocess` when executing LLM-suggested commands
     # or when trying to get help output for arbitrary commands.
     # `timeout` and `sha256sum` CLI checks removed as Python has internal equivalents used by this script.
-    required_cli_tools = ["curl", "awk", "sed", "grep", "head", "cut"] 
-    
+    required_cli_tools = ["curl", "awk", "sed", "grep", "head", "cut"]
+
     missing_deps = []
     for cmd_name in required_cli_tools:
         if shutil.which(cmd_name) is None:
             missing_deps.append(cmd_name)
-    
+
     if missing_deps:
         logger.warning(
             f"Potentially missing CLI tool(s): {', '.join(missing_deps)}. "
             "These might be needed if suggested by the LLM or for help output of certain commands. "
             "The script's core LLM calls and hashing use Python internals."
         )
-    
-    logger.debug("Dependency check (Python libs imported, some optional CLI tools checked).")
+
+    logger.debug(
+        "Dependency check (Python libs imported, some optional CLI tools checked)."
+    )
 
 
 def get_nested_value(data: Dict[str, Any], path: str, default: Any = None) -> Any:
     """Access a nested value in a dictionary using a dot-separated path."""
-    keys = path.split('.')
+    keys = path.split(".")
     current = data
     for key in keys:
         if isinstance(current, dict) and key in current:
@@ -57,7 +59,7 @@ def get_nested_value(data: Dict[str, Any], path: str, default: Any = None) -> An
                 else:
                     return default
             except ValueError:
-                return default 
+                return default
         else:
             return default
     return current
@@ -66,9 +68,9 @@ def get_nested_value(data: Dict[str, Any], path: str, default: Any = None) -> An
 def get_current_context(working_directory: str = None) -> Dict[str, str]:
     """Get current system context (time, directory, hostname)."""
     return {
-        'current_time': get_current_timestamp(),
-        'current_directory': working_directory or os.getcwd(),
-        'current_hostname': os.uname().nodename
+        "current_time": get_current_timestamp(),
+        "current_directory": working_directory or os.getcwd(),
+        "current_hostname": os.uname().nodename,
     }
 
 
@@ -77,24 +79,30 @@ def format_template_string(template: str, **kwargs) -> str:
     try:
         # Handle conditional blocks first (before regular format processing)
         import re
-        
+
         # Process {{{{if VARIABLE}}}} ... {{{{else}}}} ... {{{{end}}}} blocks
         def process_conditional(match):
             condition = match.group(1)  # The variable name
-            if_content = match.group(2)  # Content between {{{{if}}}} and {{{{else}}}}/{{{{end}}}}
-            else_content = match.group(3) if match.group(3) else ""  # Content after {{{{else}}}}
-            
+            if_content = match.group(
+                2
+            )  # Content between {{{{if}}}} and {{{{else}}}}/{{{{end}}}}
+            else_content = (
+                match.group(3) if match.group(3) else ""
+            )  # Content after {{{{else}}}}
+
             # Check if the condition variable is true in kwargs
             condition_value = kwargs.get(condition, False)
             if condition_value:
                 return if_content.strip()
             else:
                 return else_content.strip()
-        
+
         # Pattern to match {{{{if VARIABLE}}}}...{{{{else}}}}...{{{{end}}}} or {{{{if VARIABLE}}}}...{{{{end}}}}
-        conditional_pattern = r'\{\{\{\{if\s+(\w+)\}\}\}\}(.*?)(?:\{\{\{\{else\}\}\}\}(.*?))?\{\{\{\{end\}\}\}\}'
-        template = re.sub(conditional_pattern, process_conditional, template, flags=re.DOTALL)
-        
+        conditional_pattern = r"\{\{\{\{if\s+(\w+)\}\}\}\}(.*?)(?:\{\{\{\{else\}\}\}\}(.*?))?\{\{\{\{end\}\}\}\}"
+        template = re.sub(
+            conditional_pattern, process_conditional, template, flags=re.DOTALL
+        )
+
         # Now do regular template formatting
         return template.format(**kwargs)
     except KeyError as e:
@@ -121,11 +129,11 @@ def validate_file_path(file_path: Path, must_exist: bool = False) -> bool:
         if must_exist and not file_path.exists():
             logger.error(f"Required file does not exist: {file_path}")
             return False
-        
+
         if file_path.exists() and not file_path.is_file():
             logger.error(f"Path exists but is not a file: {file_path}")
             return False
-            
+
         return True
     except Exception as e:
         logger.error(f"Error validating file path {file_path}: {e}")

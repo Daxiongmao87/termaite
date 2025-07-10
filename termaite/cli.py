@@ -15,7 +15,7 @@ from . import __version__
 def create_parser() -> argparse.ArgumentParser:
     """Create the command-line argument parser."""
     from .constants import CONFIG_DIR
-    
+
     parser = argparse.ArgumentParser(
         description="term.ai.te: LLM-powered shell assistant with Plan-Act-Evaluate multi-agent architecture.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -40,63 +40,59 @@ Operation Modes:
   normal  - Allowed commands require confirmation, others are blocked
   gremlin - Allowed commands run automatically, others prompt for permission
   goblin  - All commands run without confirmation (USE WITH CAUTION!)
-        """
+        """,
     )
-    
+
     parser.add_argument(
-        'task_prompt',
-        nargs='*',
-        help="Initial task description. If empty, enters interactive mode."
+        "task_prompt",
+        nargs="*",
+        help="Initial task description. If empty, enters interactive mode.",
     )
-    
+
     parser.add_argument(
-        '-a', '--agentic',
-        action='store_true',
-        help="Enable agentic mode (Plan-Act-Evaluate multi-agent architecture)"
+        "-a",
+        "--agentic",
+        action="store_true",
+        help="Enable agentic mode (Plan-Act-Evaluate multi-agent architecture)",
     )
-    
+
     parser.add_argument(
-        '-t', '--task',
-        action='store_true',
-        help="Enable task mode (alias for agentic mode)"
+        "-t",
+        "--task",
+        action="store_true",
+        help="Enable task mode (alias for agentic mode)",
     )
-    
+
     parser.add_argument(
-        '--version',
-        action='version',
-        version=f'termaite {__version__}'
+        "--version", action="version", version=f"termaite {__version__}"
     )
-    
+
     parser.add_argument(
-        '--debug',
-        action='store_true',
-        help="Enable debug logging output"
+        "--debug", action="store_true", help="Enable debug logging output"
     )
-    
+
     parser.add_argument(
-        '--config-dir',
-        type=str,
-        help="Custom configuration directory path"
+        "--config-dir", type=str, help="Custom configuration directory path"
     )
-    
+
     parser.add_argument(
-        '--config-summary',
-        action='store_true',
-        help="Show configuration summary and exit"
+        "--config-summary",
+        action="store_true",
+        help="Show configuration summary and exit",
     )
-    
+
     parser.add_argument(
-        '--config-location',
-        action='store_true',
-        help="Show configuration file locations and exit"
+        "--config-location",
+        action="store_true",
+        help="Show configuration file locations and exit",
     )
-    
+
     parser.add_argument(
-        '--edit-config',
-        action='store_true',
-        help="Open configuration file in system default editor"
+        "--edit-config",
+        action="store_true",
+        help="Open configuration file in system default editor",
     )
-    
+
     return parser
 
 
@@ -106,27 +102,27 @@ def main(args: Optional[List[str]] = None) -> None:
     # The Python process may start in the package directory due to editable install
     # Try to get the actual user directory from various sources
     initial_working_directory = (
-        os.environ.get('TERMAITE_PWD') or  # User can set this explicitly
-        os.environ.get('PWD') or           # Shell working directory
-        os.getcwd()                        # Fallback to Python's directory
+        os.environ.get("TERMAITE_PWD")  # User can set this explicitly
+        or os.environ.get("PWD")  # Shell working directory
+        or os.getcwd()  # Fallback to Python's directory
     )
-    
+
     # Initialize colorama for cross-platform colored output
     colorama_init(autoreset=True)
-    
+
     # Parse command-line arguments
     parser = create_parser()
     parsed_args = parser.parse_args(args)
-    
+
     # Initialize the application
     try:
         # Determine if agentic mode is requested
         agentic_mode = parsed_args.agentic or parsed_args.task
-        
+
         app = create_application(
             config_dir=parsed_args.config_dir,
             debug=parsed_args.debug,
-            initial_working_directory=initial_working_directory
+            initial_working_directory=initial_working_directory,
         )
     except SystemExit:
         # Configuration setup was needed - already handled
@@ -134,22 +130,22 @@ def main(args: Optional[List[str]] = None) -> None:
     except Exception as e:
         logger.error(f"Failed to initialize termaite: {e}")
         sys.exit(1)
-    
+
     # Handle config summary request
     if parsed_args.config_summary:
         app.print_config_summary()
         return
-    
+
     # Handle config location request
     if parsed_args.config_location:
         app.print_config_location()
         return
-    
+
     # Handle config editing request
     if parsed_args.edit_config:
         app.edit_config()
         return
-    
+
     # Run in command-line or interactive mode
     if parsed_args.task_prompt:
         # Command-line mode: execute the given task
@@ -159,7 +155,7 @@ def main(args: Optional[List[str]] = None) -> None:
     else:
         # Interactive mode
         app.run_interactive_mode(agentic_mode=agentic_mode)
-    
+
     logger.system("termaite session ended.")
 
 

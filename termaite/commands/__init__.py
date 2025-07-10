@@ -6,7 +6,7 @@ from .safety import CommandSafetyChecker, create_safety_checker
 
 __all__ = [
     "CommandExecutor",
-    "CommandResult", 
+    "CommandResult",
     "create_command_executor",
     "CommandPermissionManager",
     "create_permission_manager",

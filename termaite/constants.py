@@ -37,10 +37,10 @@ OPERATION_MODES = ["normal", "gremlin", "goblin"]
 # Agent decision types
 AGENT_DECISIONS = [
     "CONTINUE_PLAN",
-    "REVISE_PLAN", 
+    "REVISE_PLAN",
     "TASK_COMPLETE",
     "TASK_FAILED",
-    "CLARIFY_USER"
+    "CLARIFY_USER",
 ]
 
 # Default configuration values

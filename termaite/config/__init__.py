@@ -7,6 +7,6 @@ __all__ = [
     "ConfigManager",
     "create_config_manager",
     "CONFIG_TEMPLATE",
-    "PAYLOAD_TEMPLATE", 
+    "PAYLOAD_TEMPLATE",
     "RESPONSE_PATH_TEMPLATE",
 ]

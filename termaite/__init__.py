@@ -6,7 +6,6 @@ to understand natural language requests and execute shell commands safely throug
 multi-agent system (Plan, Action, Evaluation).
 """
 
-
 __version__ = "1.0.0"
 __author__ = "term.ai.te Team"
 
@@ -18,7 +17,7 @@ from .config.manager import ConfigManager, create_config_manager
 __all__ = [
     "TermAIte",
     "create_application",
-    "TaskHandler", 
+    "TaskHandler",
     "create_task_handler",
     "ConfigManager",
     "create_config_manager",
