@@ -540,177 +540,30 @@ class TermAIte:
             logger.error(f"Error opening editor: {e}")
 
     def initialize_project_prompts(self) -> bool:
-        """Initialize project-specific agent prompts by investigating the current directory.
+        """Initialize project-specific agent prompts using the existing agentic architecture.
 
-        This method will:
-        1. Use an agent to investigate the current project thoroughly
-        2. Generate customized prompts for Planner, Actor, and Evaluator agents
-        3. Save these prompts to .termaite/ folder for future use
+        Uses the Plan-Act-Evaluate loop to thoroughly analyze the project and generate
+        customized prompts for Planner, Actor, and Evaluator agents, saving them
+        to .termaite/ folder for future use.
 
         Returns:
             True if initialization completed successfully, False otherwise
         """
         try:
-            # Create .termaite directory if it doesn't exist
-            termaite_dir = Path(self.initial_working_directory) / ".termaite"
-            termaite_dir.mkdir(exist_ok=True)
-            logger.system(f"Created/verified .termaite directory: {termaite_dir}")
-
-            # Step 1: Investigate the project
-            logger.system("🔍 Step 1: Investigating project directory...")
-            project_investigation_prompt = self._create_project_investigation_prompt()
-
-            # Temporarily ensure we have basic commands for investigation
-            self._ensure_investigation_commands()
-
-            # Use agentic mode to investigate the project
-            investigation_success = self.handle_task(
-                project_investigation_prompt, agentic_mode=True
+            from .project_initialization import create_project_initialization_task
+            
+            # Create and execute the project initialization task
+            init_task = create_project_initialization_task(
+                self.task_handler, 
+                self.initial_working_directory
             )
-            if not investigation_success:
-                logger.error("Failed to investigate project directory")
-                return False
-
-            # For now, we'll need to capture the investigation results from the LLM
-            # This is a limitation we'll work around by asking for a summary
-
-            # Steps 2-4: Generate customized prompts using simple mode to avoid command execution issues
-            agents_config = [
-                ("Planner", "plan_prompt", "planning phase", "PLANNER.md"),
-                ("Actor", "action_prompt", "action execution phase", "ACTOR.md"),
-                ("Evaluator", "evaluate_prompt", "evaluation phase", "EVALUATOR.md"),
-            ]
-
-            for step, (agent_name, config_key, phase_desc, filename) in enumerate(
-                agents_config, 2
-            ):
-                logger.system(f"📋 Step {step}: Generating {agent_name} prompt...")
-
-                # Create a simple prompt that asks for the enhanced prompt content
-                customization_prompt = self._create_simple_customization_prompt(
-                    agent_name, self.config.get(config_key, ""), phase_desc
-                )
-
-                # Use simple mode to avoid command execution context issues
-                success = self.handle_task(customization_prompt, agentic_mode=False)
-                if not success:
-                    logger.error(f"Failed to generate {agent_name} prompt")
-                    return False
-
-                # For now, create a placeholder file - in a real implementation,
-                # we would extract the enhanced prompt from the LLM response
-                prompt_file = termaite_dir / filename
-                placeholder_content = f"""# {agent_name} Agent - Project-Specific Prompt
-
-This file contains the enhanced {agent_name} agent prompt customized for this project.
-
-{self.config.get(config_key, "")}
-
-## Project-Specific Enhancements
-(Enhanced prompt content would be extracted from LLM response and saved here)
-"""
-                try:
-                    with open(prompt_file, "w", encoding="utf-8") as f:
-                        f.write(placeholder_content)
-                    logger.system(f"Created {filename}")
-                except Exception as e:
-                    logger.error(f"Failed to create {filename}: {e}")
-                    return False
-
-            logger.system("✅ Project initialization completed successfully!")
-            logger.system(
-                f"Project-specific prompts have been saved to: {termaite_dir}"
-            )
-            logger.system(
-                "These will be automatically used for future operations in this directory."
-            )
-
-            return True
-
+            
+            return init_task.execute()
+            
         except Exception as e:
             logger.error(f"Error during project initialization: {e}")
             return False
 
-    def _create_project_investigation_prompt(self) -> str:
-        """Create a prompt for investigating the current project."""
-        return f"""I need you to investigate this project directory thoroughly to understand what type of project this is.
-
-Please examine the current directory structure, file types, content samples, configuration files, documentation, and any other relevant information to determine:
-
-1. What type of project this is (e.g., software project, novel/book, research paper, business documents, game, website, etc.)
-2. What domain or field it relates to
-3. What the primary goals and purposes of this project appear to be
-4. What tools, technologies, or methodologies are being used
-5. What patterns and conventions are followed
-
-Please be thorough in your investigation. Look at:
-- Directory structure and organization
-- File extensions and types present
-- README files or documentation
-- Configuration files
-- Sample content from key files
-- Any build files, package files, or project metadata
-- Version control information if present
-
-Start by listing the contents of the current directory, then dive deeper into the most relevant subdirectories and files to understand the project's nature and purpose.
-
-Current directory: {self.initial_working_directory}
-
-Be comprehensive but practical in your investigation - we want to understand this project well enough to customize AI agents to work effectively within its context."""
-
-    def _create_agent_customization_prompt(
-        self, agent_name: str, current_prompt: str, phase_description: str
-    ) -> str:
-        """Create a prompt for customizing a specific agent's system prompt."""
-        return f"""Based on your investigation of this project, I need you to enhance the {agent_name} agent's system prompt to be specifically tailored for this type of project.
-
-Current {agent_name} system prompt:
----
-{current_prompt}
----
-
-Your task is to append project-specific role instructions to this prompt that will help the {agent_name} agent understand:
-
-1. The specific domain/field this project operates in
-2. Common patterns, conventions, and best practices for this type of project
-3. Relevant tools, technologies, or methodologies specific to this project type
-4. Domain-specific terminology and concepts the agent should be aware of
-5. Common tasks and workflows specific to this project type
-6. Any special considerations or constraints for working with this type of project
-
-Please provide the enhanced prompt with the additional role instructions appended. The enhanced prompt should:
-- Keep all the original functionality and formatting requirements
-- Add specific domain knowledge relevant to this project type
-- Include guidance on project-specific best practices
-- Help the agent make more informed decisions for this particular domain
-
-Please provide the complete enhanced prompt text that I should save to .termaite/{agent_name.upper()}.md
-
-The enhanced prompt should make the {agent_name} agent much more effective when working on {phase_description} tasks for this specific type of project.
-
-Format your response with the enhanced prompt clearly marked so I can extract and save it."""
-
-    def _create_simple_customization_prompt(
-        self, agent_name: str, current_prompt: str, phase_description: str
-    ) -> str:
-        """Create a simple prompt for customizing agent prompts without requiring command execution."""
-        return f"""Based on what you discovered about this project, please help me enhance the {agent_name} agent's system prompt.
-
-I want to add project-specific knowledge and guidance to make the {agent_name} more effective for this type of project.
-
-Current {agent_name} prompt (excerpt):
----
-{current_prompt[:500]}...
----
-
-Please suggest 3-5 specific enhancements I should add to this prompt that would help the {agent_name} agent work better with this project type. Focus on:
-
-1. Domain-specific terminology and concepts
-2. Common patterns and best practices for this project type
-3. Relevant tools and technologies
-4. Typical workflows and tasks
-
-Provide your suggestions as concrete additions that I can append to the existing prompt."""
 
     def _show_init_tip_if_needed(self) -> None:
         """Show a tip about the /init command if no .termaite folder exists."""
@@ -729,40 +582,6 @@ Provide your suggestions as concrete additions that I can append to the existing
                 "   This creates project-specific agent prompts in .termaite/"
             )
             logger.system("")
-
-    def _ensure_investigation_commands(self) -> None:
-        """Ensure that the task handler has basic commands available for project investigation."""
-        # Get current allowed commands
-        current_allowed, current_blacklisted = self.config_manager.get_command_maps()
-
-        # Define essential investigation commands
-        investigation_commands = {
-            "ls": "List directory contents and structure",
-            "cat": "Display file contents",
-            "head": "Show first lines of files",
-            "tail": "Show last lines of files",
-            "find": "Find files and directories",
-            "grep": "Search text in files",
-            "file": "Determine file types",
-            "wc": "Count lines, words, characters in files",
-            "tree": "Display directory tree structure",
-            "stat": "Show file/directory statistics",
-        }
-
-        # Merge with current allowed commands (investigation commands take precedence)
-        enhanced_allowed = {**current_allowed, **investigation_commands}
-
-        # Update the task handler's payload builder with enhanced commands
-        if hasattr(self, "task_handler"):
-            self.task_handler.payload_builder.set_command_maps(
-                enhanced_allowed, current_blacklisted
-            )
-            self.task_handler.permission_manager.set_command_maps(
-                enhanced_allowed, current_blacklisted
-            )
-            logger.debug(
-                f"Enhanced allowed commands for investigation: {len(enhanced_allowed)} total commands"
-            )
 
 
 def create_application(
