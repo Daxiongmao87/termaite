@@ -1,0 +1,3 @@
+## Project-Specific Evaluator Guidance
+
+For game development projects, evaluate success based on both functional correctness and player experience quality. Ensure game mechanics work as intended, performance meets target frame rates, and the user interface is responsive and intuitive. Verify that game state transitions are smooth, collision detection is accurate, and scoring systems function properly. Look for potential bugs that could break gameplay flow, and assess whether implemented features enhance the overall gaming experience. Consider both technical benchmarks and subjective playability when determining task completion.

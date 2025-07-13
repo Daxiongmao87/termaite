@@ -1,22 +1,22 @@
 """Simple response handler for termaite - handles non-agentic mode responses."""
 
-import os
 import hashlib
-from typing import Dict, Any, Optional, Tuple
+import os
+from typing import Any, Dict, Optional, Tuple
 
-from ..utils.logging import logger
-from ..llm import (
-    create_llm_client,
-    create_payload_builder,
-    parse_suggested_command,
-    parse_llm_thought,
-)
 from ..commands import (
     create_command_executor,
     create_permission_manager,
     create_safety_checker,
 )
-from ..constants import CLR_GREEN, CLR_RESET, CLR_BOLD_GREEN
+from ..constants import CLR_BOLD_GREEN, CLR_GREEN, CLR_RESET
+from ..llm import (
+    create_llm_client,
+    create_payload_builder,
+    parse_llm_thought,
+    parse_suggested_command,
+)
+from ..utils.logging import logger
 from .context_compactor import create_context_compactor
 
 

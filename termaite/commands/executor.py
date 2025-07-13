@@ -1,9 +1,9 @@
 """Command execution utilities for termaite."""
 
-import subprocess
 import os
-from typing import Optional, Tuple
+import subprocess
 from pathlib import Path
+from typing import Optional, Tuple
 
 from ..utils.logging import logger
 

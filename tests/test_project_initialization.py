@@ -1,11 +1,12 @@
 """Tests for project initialization functionality."""
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-from pathlib import Path
-import tempfile
-import shutil
 import os
+import shutil
+import tempfile
+from pathlib import Path
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 
 from termaite.core.application import TermAIte, create_application
 from termaite.llm.payload import PayloadBuilder
@@ -84,73 +85,58 @@ class TestProjectInitialization:
             ]
             assert len(tip_calls) == 0
 
+    @patch(
+        "termaite.core.project_initialization.validate_generated_prompt_files",
+        return_value=(True, []),
+    )
+    @patch(
+        "termaite.core.project_initialization.ProjectInitializationTask._add_investigation_commands"
+    )
     @patch("termaite.core.application.create_config_manager")
     @patch("termaite.core.application.create_task_handler")
     @patch("termaite.core.application.create_simple_handler")
     @patch("termaite.core.application.check_dependencies")
-    def test_initialize_project_prompts_creates_directory(
+    def test_initialize_project_prompts_succeeds(
         self,
         mock_check_deps,
         mock_simple_handler,
         mock_task_handler,
         mock_config_manager,
+        mock_add_commands,
+        mock_validate_files,
     ):
-        """Test that initialize_project_prompts creates .termaite directory."""
+        """Test that initialize_project_prompts succeeds with proper mocking."""
         # Setup mocks
-        mock_config_manager.return_value.config = {
-            "enable_debug": False,
-            "plan_prompt": "test planner prompt",
-            "action_prompt": "test actor prompt",
-            "evaluate_prompt": "test evaluator prompt",
-        }
+        mock_config_manager.return_value.config = {"enable_debug": False}
         mock_config_manager.return_value.get_command_maps.return_value = ({}, {})
 
-        app = TermAIte(initial_working_directory=str(self.test_dir))
+        # Mock the task handler instance
+        mock_task_handler_instance = MagicMock()
+        mock_task_handler.return_value = mock_task_handler_instance
 
-        # Mock the handle_task method to return True
-        app.handle_task = Mock(return_value=True)
+        # This function will be the side effect for the handle_task calls
+        def mock_handle_task(task_prompt_str):
+            if "Investigate" in task_prompt_str:
+                return (True, "investigation summary")
+            # For the generation task, simulate file creation
+            else:
+                (self.termaite_dir / "PLANNER.md").write_text("Planner content")
+                (self.termaite_dir / "ACTOR.md").write_text("Actor content")
+                (self.termaite_dir / "EVALUATOR.md").write_text("Evaluator content")
+                return (True, "generation context")
+
+        mock_task_handler_instance.handle_task.side_effect = mock_handle_task
+
+        app = TermAIte(initial_working_directory=str(self.test_dir))
 
         # Call initialize_project_prompts
         result = app.initialize_project_prompts()
 
-        # Verify that the .termaite directory was created
+        # Verify that the .termaite directory was created and result is True
         assert self.termaite_dir.exists()
         assert self.termaite_dir.is_dir()
+        assert (self.termaite_dir / "PLANNER.md").exists()
         assert result is True
-
-    def test_create_project_investigation_prompt(self):
-        """Test the project investigation prompt creation."""
-        with patch("termaite.core.application.create_config_manager") as mock_config:
-            mock_config.return_value.config = {"enable_debug": False}
-            mock_config.return_value.get_command_maps.return_value = ({}, {})
-
-            app = TermAIte(initial_working_directory=str(self.test_dir))
-            prompt = app._create_project_investigation_prompt()
-
-            # Verify prompt contains key elements
-            assert "investigate this project directory" in prompt.lower()
-            assert str(self.test_dir) in prompt
-            assert "directory structure" in prompt.lower()
-            assert "file types" in prompt.lower()
-
-    def test_create_agent_customization_prompt(self):
-        """Test the agent customization prompt creation."""
-        with patch("termaite.core.application.create_config_manager") as mock_config:
-            mock_config.return_value.config = {"enable_debug": False}
-            mock_config.return_value.get_command_maps.return_value = ({}, {})
-
-            app = TermAIte(initial_working_directory=str(self.test_dir))
-
-            current_prompt = "This is the current planner prompt"
-            prompt = app._create_agent_customization_prompt(
-                "Planner", current_prompt, "planning phase"
-            )
-
-            # Verify prompt contains key elements
-            assert "Planner" in prompt
-            assert current_prompt in prompt
-            assert "PLANNER.md" in prompt
-            assert "project-specific role instructions" in prompt
 
 
 class TestCustomizedPromptLoading:

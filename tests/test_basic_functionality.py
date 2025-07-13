@@ -6,14 +6,14 @@ import pytest
 def test_imports():
     """Test that core modules can be imported."""
     # Test core imports
+    from termaite import __version__
+    from termaite.cli import create_parser, main
     from termaite.core.application import (
-        TermAIte,
         InteractiveSession,
+        TermAIte,
         create_application,
     )
-    from termaite.cli import main, create_parser
     from termaite.utils.logging import Logger
-    from termaite import __version__
 
     # Verify basic functionality
     assert __version__ is not None
@@ -55,9 +55,9 @@ def test_logger_basic():
 def test_constants_import():
     """Test that constants can be imported."""
     from termaite.constants import (
-        CLR_RESET,
         CLR_GREEN,
         CLR_RED,
+        CLR_RESET,
         CONFIG_DIR,
         CONFIG_FILE,
     )
@@ -69,7 +69,7 @@ def test_constants_import():
 
 def test_version_info():
     """Test version information."""
-    from termaite import __version__, __author__
+    from termaite import __author__, __version__
 
     assert isinstance(__version__, str)
     assert len(__version__) > 0
@@ -79,12 +79,12 @@ def test_version_info():
 def test_package_structure():
     """Test that package structure is intact."""
     import termaite
-    import termaite.core
     import termaite.cli
-    import termaite.utils
-    import termaite.config
     import termaite.commands
+    import termaite.config
+    import termaite.core
     import termaite.llm
+    import termaite.utils
 
     # Verify modules have expected attributes
     assert hasattr(termaite.core, "application")

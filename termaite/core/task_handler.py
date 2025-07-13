@@ -1,29 +1,29 @@
 """Task handler with Plan-Act-Evaluate loop for termaite."""
 
-import re
-import os
 import hashlib
-from typing import Dict, Any, Optional, Tuple
+import os
+import re
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, Optional, Tuple
 
-from ..utils.logging import logger
-from ..llm import (
-    create_llm_client,
-    create_payload_builder,
-    parse_llm_plan,
-    parse_llm_instruction,
-    parse_llm_decision,
-    parse_llm_thought,
-    parse_suggested_command,
-    parse_llm_summary,
-)
 from ..commands import (
     create_command_executor,
     create_permission_manager,
     create_safety_checker,
 )
-from ..constants import CLR_GREEN, CLR_RESET, CLR_BOLD_GREEN
+from ..constants import CLR_BOLD_GREEN, CLR_GREEN, CLR_RESET
+from ..llm import (
+    create_llm_client,
+    create_payload_builder,
+    parse_llm_decision,
+    parse_llm_instruction,
+    parse_llm_plan,
+    parse_llm_summary,
+    parse_llm_thought,
+    parse_suggested_command,
+)
+from ..utils.logging import logger
 from .context_compactor import create_context_compactor
 
 
@@ -108,23 +108,25 @@ class TaskHandler:
 
         logger.debug("TaskHandler initialized")
 
-    def handle_task(self, user_prompt: str) -> bool:
+    def handle_task(self, user_prompt: str) -> Tuple[bool, str]:
         """Handle a complete task through Plan-Act-Evaluate loop.
 
         Args:
             user_prompt: Initial user request
 
         Returns:
-            True if task completed successfully, False otherwise
+            A tuple containing:
+            - True if task completed successfully, False otherwise
+            - The final context string of the task execution
         """
         # Initialize task state
         state = TaskState()
         task_status = TaskStatus.IN_PROGRESS
         current_context = user_prompt
 
-        # Check and compact context if needed
+        # Check and compact context if needed, preserving current user prompt
         pwd_hash = hashlib.sha256(os.getcwd().encode("utf-8")).hexdigest()
-        self.context_compactor.check_and_compact_context(pwd_hash)
+        self.context_compactor.check_and_compact_context(pwd_hash, user_prompt)
 
         # Main Plan-Act-Evaluate loop
         while task_status == TaskStatus.IN_PROGRESS:
@@ -159,7 +161,7 @@ class TaskHandler:
             # Execute evaluation phase
             eval_context = self._build_evaluation_context(user_prompt, state)
             task_status, current_context = self._execute_evaluation_phase(
-                eval_context, state
+                eval_context, state, user_prompt
             )
 
         # Return final result
@@ -167,129 +169,182 @@ class TaskHandler:
             logger.user("Task completed successfully.")
             # Generate completion summary
             self._generate_completion_summary(user_prompt, state)
-            return True
+            final_context = self._build_evaluation_context(user_prompt, state)
+            return True, final_context
         else:
             logger.user("Task failed or was aborted.")
-            return False
+            final_context = self._build_evaluation_context(user_prompt, state)
+            return False, final_context
 
     def _execute_plan_phase(self, context: str, state: TaskState) -> TaskStatus:
-        """Execute the planning phase."""
-        # Get LLM response for planning
-        payload = self.payload_builder.prepare_payload("plan", context)
-        if not payload:
-            logger.error("Failed to prepare payload for PLAN phase")
-            return TaskStatus.FAILED
+        """Execute the planning phase with retry logic for parsing."""
+        attempt = 0
+        while True:
+            attempt += 1
+            # Get LLM response for planning
+            payload = self.payload_builder.prepare_payload("plan", context)
+            if not payload:
+                logger.error("Failed to prepare payload for PLAN phase")
+                return TaskStatus.FAILED
 
-        response = self.llm_client.send_request(payload)
-        if not response:
-            logger.error("No response from LLM for PLAN phase")
-            return TaskStatus.FAILED
+            response = self.llm_client.send_request(payload)
+            if not response:
+                logger.error("No response from LLM for PLAN phase")
+                return TaskStatus.FAILED
 
-        # Append to context for history
-        self.config_manager.append_context(f"Planner Input: {context}", response)
+            # Append to context for history
+            self.config_manager.append_context(
+                f"Planner Input (Attempt {attempt + 1}): {context}", response
+            )
 
-        # Parse LLM response
-        thought = parse_llm_thought(response)
-        if thought:
-            logger.plan_agent(f"[Planner Thought]: {thought}")
+            # Parse LLM response
+            thought = parse_llm_thought(response)
+            if thought:
+                logger.plan_agent(f"[Planner Thought]: {thought}")
 
-        decision = parse_llm_decision(response)
+            decision = parse_llm_decision(response)
+            if decision.startswith("CLARIFY_USER:"):
+                if self.config.get("allow_clarifying_questions", True):
+                    clarification_question = decision.split(":", 1)[1].strip()
+                    logger.plan_agent(
+                        f"[Planner Clarification]: {clarification_question}"
+                    )
+                    print(f"\n{CLR_BOLD_GREEN}{clarification_question}{CLR_RESET}")
+                    print(f"{CLR_GREEN}Response: {CLR_RESET}", end="")
+                    state.user_clarification = input()
+                    state.last_eval_decision = "PLANNER_CLARIFY"
+                    state.current_plan = ""
+                    return TaskStatus.IN_PROGRESS
+                else:
+                    logger.warning(
+                        "Plan Agent attempted CLARIFY_USER when questions disabled"
+                    )
+                    # Treat as a format failure to trigger retry
+                    context = (
+                        f"{context}\n\nPREVIOUS ATTEMPT FAILED. "
+                        "Your last response requested user clarification, which is disabled. "
+                        "Please generate a plan without asking questions."
+                    )
+                    continue
 
-        # Handle clarification requests
-        if decision.startswith("CLARIFY_USER:"):
-            if self.config.get("allow_clarifying_questions", True):
-                clarification_question = decision.split(":", 1)[1].strip()
-                logger.plan_agent(f"[Planner Clarification]: {clarification_question}")
-                print(f"\n{CLR_BOLD_GREEN}{clarification_question}{CLR_RESET}")
-                print(f"{CLR_GREEN}Response: {CLR_RESET}", end="")
-                state.user_clarification = input()
-                # Return to planning with clarification
-                state.last_eval_decision = "PLANNER_CLARIFY"
-                state.current_plan = ""
+            # Extract plan, instruction, and summary
+            state.current_plan = parse_llm_plan(response)
+            state.current_instruction = parse_llm_instruction(response)
+            state.planner_summary = parse_llm_summary(response)
+
+            # Validate plan and instruction
+            if state.current_plan and state.current_instruction:
+                if state.planner_summary:
+                    logger.plan_agent(f"[Planner Summary]: {state.planner_summary}")
+                logger.plan_agent(f"[Planner Checklist]:\n{state.current_plan}")
+                logger.plan_agent(f"[Next Instruction]: {state.current_instruction}")
+
+                state.plan_array = [
+                    line.strip()
+                    for line in state.current_plan.splitlines()
+                    if line.strip()
+                ]
+                state.step_index = 0
+                state.user_clarification = ""
+                state.last_eval_decision = ""
                 return TaskStatus.IN_PROGRESS
-            else:
-                logger.warning(
-                    f"Plan Agent attempted CLARIFY_USER when questions disabled"
+
+            # If validation fails, prepare for retry
+            error_messages = []
+            if not state.current_plan:
+                error_messages.append(
+                    "Response did not contain a valid `<checklist>...</checklist>` block."
                 )
-                state.last_eval_decision = "REVISE_PLAN"
-                state.current_plan = ""
-                return TaskStatus.IN_PROGRESS
+            if not state.current_instruction:
+                error_messages.append(
+                    "Response did not contain a valid `<instruction>...</instruction>` block."
+                )
+            error_message = " ".join(error_messages)
 
-        # Extract plan and instruction
-        state.current_plan = parse_llm_plan(response)
-        state.current_instruction = parse_llm_instruction(response)
+            logger.warning(
+                f"Planner failed to provide required output (Attempt {attempt}). "
+                f"Reason: {error_message} Response: {response}"
+            )
 
-        # Extract planner summary for inter-agent coordination
-        state.planner_summary = parse_llm_summary(response)
-        if state.planner_summary:
-            logger.plan_agent(f"[Planner Summary]: {state.planner_summary}")
-
-        # Validate plan and instruction
-        if not state.current_plan:
-            logger.warning("Planner did not return a checklist")
-            state.last_eval_decision = "REVISE_PLAN"
-            state.current_plan = ""
-            return TaskStatus.IN_PROGRESS
-
-        if not state.current_instruction:
-            logger.warning("Planner did not return an instruction")
-            state.last_eval_decision = "REVISE_PLAN"
-            state.current_plan = ""
-            return TaskStatus.IN_PROGRESS
-
-        # Log successful planning
-        logger.plan_agent(f"[Planner Checklist]:\n{state.current_plan}")
-        logger.plan_agent(f"[Next Instruction]: {state.current_instruction}")
-
-        # Update state
-        state.plan_array = [
-            line.strip() for line in state.current_plan.splitlines() if line.strip()
-        ]
-        state.step_index = 0
-        state.user_clarification = ""
-        state.last_eval_decision = ""
-
-        return TaskStatus.IN_PROGRESS
+            context = f"""<correction_request>
+<error>
+<type>Invalid Response Format</type>
+<message>Your previous response was malformed and did not follow the required structure.</message>
+<details>{error_message}</details>
+</error>
+<instruction>
+You MUST correct your output. Your response MUST contain BOTH a `<checklist>...</checklist>` block AND an `<instruction>...</instruction>` block. This is not optional. Failure to comply will result in task termination.
+</instruction>
+<original_context>
+{context}
+</original_context>
+</correction_request>"""
 
     def _execute_action_phase(self, context: str, state: TaskState) -> TaskStatus:
-        """Execute the action phase."""
-        # Get LLM response for action
-        payload = self.payload_builder.prepare_payload("action", context)
-        if not payload:
-            logger.error("Failed to prepare payload for ACTION phase")
-            return TaskStatus.FAILED
+        """Execute the action phase with retry logic for command parsing."""
+        max_retries = self.config.get("action_agent_retries", 3)
 
-        response = self.llm_client.send_request(payload)
-        if not response:
-            logger.error("No response from LLM for ACTION phase")
-            return TaskStatus.FAILED
+        for attempt in range(max_retries):
+            # Get LLM response for action
+            payload = self.payload_builder.prepare_payload("action", context)
+            if not payload:
+                logger.error("Failed to prepare payload for ACTION phase")
+                return TaskStatus.FAILED
 
-        # Append to context for history
-        self.config_manager.append_context(f"Actor Input: {context}", response)
+            response = self.llm_client.send_request(payload)
+            if not response:
+                logger.error("No response from LLM for ACTION phase")
+                return TaskStatus.FAILED
 
-        # Parse LLM response
-        thought = parse_llm_thought(response)
-        if thought:
-            logger.action_agent(f"[Actor Thought]: {thought}")
-
-        # Extract actor summary for inter-agent coordination
-        state.actor_summary = parse_llm_summary(response)
-        if state.actor_summary:
-            logger.action_agent(f"[Actor Summary]: {state.actor_summary}")
-
-        suggested_command = parse_suggested_command(response)
-
-        # Handle different types of responses
-        if suggested_command:
-            return self._handle_command_suggestion(suggested_command, state)
-        else:
-            # Action agent should ALWAYS provide a command, never text responses
-            logger.error(
-                f"Action agent failed to provide a command. Response: {response}"
+            # Append to context for history
+            self.config_manager.append_context(
+                f"Actor Input (Attempt {attempt + 1}): {context}", response
             )
-            state.last_action_taken = "Action agent error: no command provided"
-            state.last_action_result = f"Action agent response contained no ```agent_command``` block: {response}"
-            return TaskStatus.FAILED
+
+            # Parse LLM response
+            thought = parse_llm_thought(response)
+            if thought:
+                logger.action_agent(f"[Actor Thought]: {thought}")
+
+            state.actor_summary = parse_llm_summary(response)
+            if state.actor_summary:
+                logger.action_agent(f"[Actor Summary]: {state.actor_summary}")
+
+            suggested_command = parse_suggested_command(response)
+
+            if suggested_command:
+                return self._handle_command_suggestion(suggested_command, state)
+
+            # If no command, prepare for retry
+            error_message = (
+                f"Action agent response did not contain a valid `<command>...</command>` block. "
+                f"This is a format violation. You MUST provide a command."
+            )
+            logger.warning(
+                f"Action agent failed to provide a command (Attempt {attempt + 1}/{max_retries}). "
+                f"Response: {response}"
+            )
+
+            if attempt < max_retries - 1:
+                # Re-prompt with corrective feedback
+                context = (
+                    f"{context}\n\nPREVIOUS ATTEMPT FAILED. "
+                    f"Your last response was invalid. Reason: {error_message}\n"
+                    "Please correct your response and provide a valid command."
+                )
+            else:
+                # Final attempt failed
+                logger.error(
+                    f"Action agent failed to provide a command after {max_retries} attempts."
+                )
+                state.last_action_taken = "Action agent error: no command provided"
+                state.last_action_result = (
+                    f"Action agent response contained no `<command>` block after {max_retries} retries. "
+                    f"Final response: {response}"
+                )
+                return TaskStatus.FAILED
+
+        return TaskStatus.FAILED  # Should not be reached, but as a fallback
 
     def _handle_command_suggestion(self, command: str, state: TaskState) -> TaskStatus:
         """Handle a command suggestion from the action agent."""
@@ -361,51 +416,72 @@ class TaskHandler:
         return TaskStatus.IN_PROGRESS
 
     def _execute_evaluation_phase(
-        self, context: str, state: TaskState
+        self, context: str, state: TaskState, original_prompt: str
     ) -> tuple[TaskStatus, str]:
-        """Execute the evaluation phase."""
-        # Get LLM response for evaluation
-        payload = self.payload_builder.prepare_payload("evaluate", context)
-        if not payload:
-            logger.error("Failed to prepare payload for EVALUATION phase")
-            return TaskStatus.FAILED, ""
+        """Execute the evaluation phase with retry logic for parsing."""
+        max_retries = self.config.get("eval_agent_retries", 3)
+        current_context = context
 
-        response = self.llm_client.send_request(payload)
-        if not response:
-            logger.error("No response from LLM for EVALUATION phase")
-            return TaskStatus.FAILED, ""
+        for attempt in range(max_retries):
+            # Get LLM response for evaluation
+            payload = self.payload_builder.prepare_payload("evaluate", current_context)
+            if not payload:
+                logger.error("Failed to prepare payload for EVALUATION phase")
+                return TaskStatus.FAILED, ""
 
-        # Append to context for history
-        self.config_manager.append_context(f"Evaluator Input: {context}", response)
+            response = self.llm_client.send_request(payload)
+            if not response:
+                logger.error("No response from LLM for EVALUATION phase")
+                return TaskStatus.FAILED, ""
 
-        # Parse LLM response
-        thought = parse_llm_thought(response)
-        if thought:
-            logger.eval_agent(f"[Evaluator Thought]: {thought}")
+            # Append to context for history
+            self.config_manager.append_context(
+                f"Evaluator Input (Attempt {attempt + 1}): {current_context}", response
+            )
 
-        # Extract evaluator summary for inter-agent coordination
-        state.evaluator_summary = parse_llm_summary(response)
-        if state.evaluator_summary:
-            logger.eval_agent(f"[Evaluator Summary]: {state.evaluator_summary}")
+            # Parse LLM response
+            thought = parse_llm_thought(response)
+            if thought:
+                logger.eval_agent(f"[Evaluator Thought]: {thought}")
 
-        decision = parse_llm_decision(response)
-        if not decision:
-            logger.warning("Evaluator: no decision. Assuming CONTINUE_PLAN")
-            decision = "CONTINUE_PLAN: No decision by LLM. Defaulting to continue."
+            state.evaluator_summary = parse_llm_summary(response)
+            if state.evaluator_summary:
+                logger.eval_agent(f"[Evaluator Summary]: {state.evaluator_summary}")
 
-        logger.eval_agent(f"[Evaluator Decision]: {decision}")
+            decision = parse_llm_decision(response)
+            if decision:
+                logger.eval_agent(f"[Evaluator Decision]: {decision}")
+                from ..llm.parsers import extract_decision_type_and_message
 
-        # Parse decision type and message
-        from ..llm.parsers import extract_decision_type_and_message
+                decision_type, message = extract_decision_type_and_message(decision)
+                state.last_eval_decision = decision_type
+                return self._process_evaluation_decision(decision_type, message, state, original_prompt)
 
-        decision_type, message = extract_decision_type_and_message(decision)
-        state.last_eval_decision = decision_type
+            # If no decision, prepare for retry
+            error_message = (
+                "Response did not contain a valid `<decision>...</decision>` block."
+            )
+            logger.warning(
+                f"Evaluator failed to provide a decision (Attempt {attempt + 1}/{max_retries}). "
+                f"Reason: {error_message} Response: {response}"
+            )
 
-        # Handle different decision types
-        return self._process_evaluation_decision(decision_type, message, state)
+            if attempt < max_retries - 1:
+                current_context = (
+                    f"{context}\n\nPREVIOUS ATTEMPT FAILED. "
+                    f"Your last response was invalid. Reason: {error_message}\n"
+                    "Please correct your response and provide a valid decision."
+                )
+            else:
+                logger.error(
+                    f"Evaluator failed to provide a valid decision after {max_retries} attempts."
+                )
+                return TaskStatus.FAILED, ""
+
+        return TaskStatus.FAILED, ""
 
     def _process_evaluation_decision(
-        self, decision_type: str, message: str, state: TaskState
+        self, decision_type: str, message: str, state: TaskState, original_prompt: str
     ) -> tuple[TaskStatus, str]:
         """Process the evaluator's decision and return next status and context."""
         if decision_type == "TASK_COMPLETE":
@@ -418,17 +494,15 @@ class TaskHandler:
 
         elif decision_type == "CONTINUE_PLAN":
             logger.eval_agent(f"Evaluator: CONTINUE_PLAN. {message}")
-            next_context = (
-                f"Original request: '{state.current_instruction}'.\n"
-                f"Current Plan:\n{state.current_plan}\n"
-                f"Prev instruction ('{state.current_instruction}') result: '{state.last_action_result}'.\n"
-                f"Evaluator feedback: '{message}'.\n"
-                "Provide next instruction. If plan complete, instruct actor 'report_task_completion'."
-            )
-            # Reset for next instruction
-            state.current_plan = ""
-            state.current_instruction = ""
-            state.user_clarification = ""
+            state.step_index += 1
+            if state.step_index < len(state.plan_array):
+                state.current_instruction = state.plan_array[state.step_index]
+            else:
+                state.current_instruction = "report_task_completion"
+
+            # Build context for the action phase, as the plan continues
+            next_context = self._build_action_context(original_prompt, state)
+            state.user_clarification = ""  # Clear user clarification after use
             return TaskStatus.IN_PROGRESS, next_context
 
         elif decision_type == "REVISE_PLAN":

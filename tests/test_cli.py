@@ -1,7 +1,9 @@
 """Tests for CLI functionality."""
 
-import pytest
 from unittest.mock import Mock, patch
+
+import pytest
+
 from termaite.cli import create_parser, main
 
 

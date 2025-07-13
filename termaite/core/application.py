@@ -1,19 +1,19 @@
 """Main application class for termaite."""
 
-import signal
-import shutil
-import sys
 import os
-from typing import Optional, List, Dict, Any
-from pathlib import Path
+import shutil
+import signal
+import sys
 import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from ..config.manager import create_config_manager
-from ..core.task_handler import create_task_handler
-from ..core.simple_handler import create_simple_handler
-from ..utils.logging import logger
-from ..utils.helpers import check_dependencies
 from ..constants import CLR_BOLD_RED, CLR_RESET
+from ..core.simple_handler import create_simple_handler
+from ..core.task_handler import create_task_handler
+from ..utils.helpers import check_dependencies
+from ..utils.logging import logger
 
 
 class InteractiveSession:
@@ -169,7 +169,8 @@ class TermAIte:
         """
         try:
             if agentic_mode:
-                return self.task_handler.handle_task(prompt)
+                success, _ = self.task_handler.handle_task(prompt)
+                return success
             else:
                 return self.simple_handler.handle_simple_request(prompt)
         except KeyboardInterrupt:
@@ -497,8 +498,8 @@ class TermAIte:
 
     def edit_config(self) -> None:
         """Open the configuration file in the system's default editor."""
-        import subprocess
         import os
+        import subprocess
 
         config_file = self.config_manager.config_file
 
@@ -551,19 +552,17 @@ class TermAIte:
         """
         try:
             from .project_initialization import create_project_initialization_task
-            
+
             # Create and execute the project initialization task
             init_task = create_project_initialization_task(
-                self.task_handler, 
-                self.initial_working_directory
+                self.task_handler, self.initial_working_directory
             )
-            
+
             return init_task.execute()
-            
+
         except Exception as e:
             logger.error(f"Error during project initialization: {e}")
             return False
-
 
     def _show_init_tip_if_needed(self) -> None:
         """Show a tip about the /init command if no .termaite folder exists."""

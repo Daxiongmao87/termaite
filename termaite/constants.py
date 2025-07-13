@@ -1,6 +1,7 @@
 """Constants used throughout the termaite package."""
 
 from pathlib import Path
+
 from colorama import Fore, Style
 
 # Package information

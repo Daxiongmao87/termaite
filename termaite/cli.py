@@ -1,15 +1,15 @@
 """Command-line interface for termaite."""
 
 import argparse
-import sys
 import os
+import sys
 from typing import List, Optional
 
 from colorama import init as colorama_init
 
+from . import __version__
 from .core.application import create_application
 from .utils.logging import logger
-from . import __version__
 
 
 def create_parser() -> argparse.ArgumentParser:

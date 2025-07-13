@@ -1,0 +1,3 @@
+## Project-Specific Actor Guidance
+
+For game development projects, focus on using development tools and commands that support iterative prototyping and testing. Utilize version control for asset management, employ game engines' command-line interfaces when available, and leverage automated testing frameworks for game logic verification. Run frequent builds to catch integration issues early, and use profiling tools to monitor performance. When implementing game features, execute commands that test both functionality and user experience, ensuring each component works within the broader game system.

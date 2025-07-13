@@ -1,7 +1,7 @@
 """Command safety checks and validation for termaite."""
 
 import re
-from typing import List, Dict, Any, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..utils.logging import logger
 

@@ -1,25 +1,25 @@
 """Logging utilities for termaite."""
 
-import sys
 import datetime
+import sys
 from typing import TextIO
 
 from ..constants import (
-    CLR_RESET,
-    CLR_CYAN,
-    CLR_BOLD_CYAN,
-    CLR_GREEN,
-    CLR_BOLD_GREEN,
-    CLR_MAGENTA,
-    CLR_BOLD_MAGENTA,
     CLR_BLUE,
     CLR_BOLD_BLUE,
-    CLR_YELLOW,
-    CLR_BOLD_YELLOW,
-    CLR_WHITE,
-    CLR_BOLD_WHITE,
-    CLR_RED,
+    CLR_BOLD_CYAN,
+    CLR_BOLD_GREEN,
+    CLR_BOLD_MAGENTA,
     CLR_BOLD_RED,
+    CLR_BOLD_WHITE,
+    CLR_BOLD_YELLOW,
+    CLR_CYAN,
+    CLR_GREEN,
+    CLR_MAGENTA,
+    CLR_RED,
+    CLR_RESET,
+    CLR_WHITE,
+    CLR_YELLOW,
 )
 
 

@@ -2,12 +2,12 @@
 
 import json
 import math
-from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
-from ..utils.logging import logger
 from ..llm import create_llm_client, create_payload_builder
+from ..utils.logging import logger
 
 
 @dataclass
@@ -112,6 +112,58 @@ class ContextCompactor:
 
         return total_tokens > threshold_tokens
 
+    def create_context_summary(self, entries: List[ContextEntry]) -> str:
+        """Create a summary paragraph from historical context entries.
+
+        Args:
+            entries: Context entries to summarize
+
+        Returns:
+            Summary paragraph string
+        """
+        if not entries:
+            return ""
+
+        # Build context string from entries
+        context_parts = []
+        for entry in entries:
+            context_parts.append(f"User: {entry.user_prompt}")
+            context_parts.append(f"Assistant: {entry.llm_response}")
+
+        context_text = "\n".join(context_parts)
+
+        # Get summary from LLM
+        summary_prompt = """
+        You are a context summarizer. Create a single detailed paragraph that summarizes the following historical conversation context. Focus on:
+        - Key decisions and outcomes that were reached
+        - Important context that may be relevant for future actions
+        - Any significant errors or successes
+        - The general flow and progression of the conversation
+        
+        Write this as ONE cohesive paragraph that captures the essential information from this historical context.
+        
+        Historical context to summarize:
+        {context}
+        
+        Summary paragraph:
+        """
+
+        prompt = summary_prompt.format(context=context_text)
+        payload = self.payload_builder.prepare_payload("simple", prompt)
+        if not payload:
+            logger.warning("Failed to prepare payload for context summarization")
+            return f"[Summary of {len(entries)} historical entries - LLM unavailable]"
+
+        response = self.llm_client.send_request(payload)
+        if not response:
+            logger.warning("No response from LLM for context summarization")
+            return f"[Summary of {len(entries)} historical entries - LLM failed]"
+
+        logger.debug(
+            f"Summarized {len(entries)} entries from {len(context_text)} to {len(response)} characters"
+        )
+        return response
+
     def compact_context_segment(
         self, entries: List[ContextEntry], compaction_level: int
     ) -> str:
@@ -158,12 +210,13 @@ class ContextCompactor:
         return response
 
     def compact_context(
-        self, context_entries: List[ContextEntry]
+        self, context_entries: List[ContextEntry], current_user_prompt: str = None
     ) -> List[ContextEntry]:
         """Compact context using progressive compaction strategy.
 
         Args:
             context_entries: List of context entries to compact
+            current_user_prompt: The current user prompt being processed
 
         Returns:
             List of compacted context entries
@@ -173,73 +226,84 @@ class ContextCompactor:
 
         logger.system("Context approaching size limit, initiating compaction...")
 
-        # Find original user prompt and plan entries to preserve
-        original_request = None
-        plan_entries = []
-        regular_entries = []
+        # Find the index of the latest plan entry to preserve it.
+        latest_plan_index = -1
+        for i, entry in reversed(list(enumerate(context_entries))):
+            if entry.is_plan:
+                latest_plan_index = i
+                break
 
-        for entry in context_entries:
-            if entry.is_original_request:
-                original_request = entry
-            elif entry.is_plan:
-                plan_entries.append(entry)
-            else:
-                regular_entries.append(entry)
+        # Find the index of the current prompt entry to preserve it.
+        current_prompt_index = -1
+        if current_user_prompt:
+            for i, entry in reversed(list(enumerate(context_entries))):
+                if current_user_prompt in entry.user_prompt:
+                    current_prompt_index = i
+                    break
 
-        # Calculate segments for progressive compaction
-        total_entries = len(regular_entries)
-        if total_entries < 4:
-            # Not enough entries to compact meaningfully
+        # Identify entries that are eligible for compaction (i.e., not the two preserved entries).
+        compactable_indices = []
+        for i in range(len(context_entries)):
+            if i != latest_plan_index and i != current_prompt_index:
+                compactable_indices.append(i)
+
+        # If there are not enough entries to compact, return the original list.
+        if len(compactable_indices) < 2:
+            logger.debug("Not enough compactable entries to proceed.")
             return context_entries
 
-        # Divide into segments: 25% very compact, 25% compact, 50% untouched
-        very_compact_count = max(1, total_entries // 4)
-        compact_count = max(1, total_entries // 4)
+        # Determine the oldest 50% of the compactable entries to be replaced by a summary.
+        num_to_compact = len(compactable_indices) // 2
+        indices_to_compact = set(compactable_indices[:num_to_compact])
 
-        # Split entries into segments
-        very_compact_entries = regular_entries[:very_compact_count]
-        compact_entries = regular_entries[
-            very_compact_count : very_compact_count + compact_count
+        if not indices_to_compact:
+            logger.debug("No entries selected for compaction.")
+            return context_entries
+
+        entries_to_summarize = [
+            context_entries[i] for i in sorted(list(indices_to_compact))
         ]
-        untouched_entries = regular_entries[very_compact_count + compact_count :]
 
+        logger.debug(
+            f"Compaction plan: {len(entries_to_summarize)} oldest entries → 1 summary"
+        )
+
+        # Create a single summary of the entries marked for compaction.
+        summary_text = self.create_context_summary(entries_to_summarize)
+        summary_entry = ContextEntry(
+            type="compacted",
+            user_prompt="[HISTORICAL CONTEXT SUMMARY]",
+            llm_response=summary_text,
+            timestamp=entries_to_summarize[0].timestamp,
+            compaction_level=1,
+        )
+
+        # Build the new context list, maintaining the original chronological order.
         result_entries = []
+        summary_inserted = False
+        for i, entry in enumerate(context_entries):
+            if i in indices_to_compact:
+                # When we encounter the first entry to be compacted, insert the summary once.
+                if not summary_inserted:
+                    result_entries.append(summary_entry)
+                    summary_inserted = True
+            else:
+                # Keep all other entries in their original place.
+                result_entries.append(entry)
 
-        # Preserve original request
-        if original_request:
-            result_entries.append(original_request)
-
-        # Preserve plan entries
-        result_entries.extend(plan_entries)
-
-        # Add very compact segment
-        if very_compact_entries:
-            very_compact_text = self.compact_context_segment(very_compact_entries, 2)
-            very_compact_entry = ContextEntry(
-                type="compacted",
-                user_prompt="[COMPACTED CONTEXT]",
-                llm_response=very_compact_text,
-                timestamp=very_compact_entries[0].timestamp,
-                compaction_level=2,
+        # If the current user prompt is new and wasn't in the original list, append it now.
+        if current_user_prompt and current_prompt_index == -1:
+            current_prompt_entry = ContextEntry(
+                type="current_prompt",
+                user_prompt=current_user_prompt,
+                llm_response="[CURRENT TASK]",
+                timestamp="",  # This should be ideally set to current time
+                is_original_request=False,
+                is_plan=False,
             )
-            result_entries.append(very_compact_entry)
+            result_entries.append(current_prompt_entry)
 
-        # Add compact segment
-        if compact_entries:
-            compact_text = self.compact_context_segment(compact_entries, 1)
-            compact_entry = ContextEntry(
-                type="compacted",
-                user_prompt="[COMPACTED CONTEXT]",
-                llm_response=compact_text,
-                timestamp=compact_entries[0].timestamp,
-                compaction_level=1,
-            )
-            result_entries.append(compact_entry)
-
-        # Add untouched entries
-        result_entries.extend(untouched_entries)
-
-        # Calculate space saved
+        # Log the result of the compaction.
         original_size = sum(
             len(e.user_prompt + e.llm_response) for e in context_entries
         )
@@ -370,11 +434,14 @@ class ContextCompactor:
             logger.error(f"Failed to save compacted context: {e}")
             return False
 
-    def check_and_compact_context(self, pwd_hash: str) -> bool:
+    def check_and_compact_context(
+        self, pwd_hash: str, current_user_prompt: str = None
+    ) -> bool:
         """Check if context needs compaction and perform it if needed.
 
         Args:
             pwd_hash: Current working directory hash
+            current_user_prompt: The current user prompt being processed
 
         Returns:
             True if compaction was performed or not needed
@@ -401,8 +468,8 @@ class ContextCompactor:
         if not self.should_compact_context(entries):
             return True  # No compaction needed
 
-        # Perform compaction
-        compacted_entries = self.compact_context(entries)
+        # Perform compaction with current user prompt
+        compacted_entries = self.compact_context(entries, current_user_prompt)
 
         # Save compacted context
         return self.save_compacted_context(compacted_entries, pwd_hash)

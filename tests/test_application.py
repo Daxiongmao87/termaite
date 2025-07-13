@@ -1,8 +1,10 @@
 """Tests for the main application functionality."""
 
-import pytest
 from unittest.mock import Mock, patch
-from termaite.core.application import TermAIte, InteractiveSession, create_application
+
+import pytest
+
+from termaite.core.application import InteractiveSession, TermAIte, create_application
 
 
 class TestInteractiveSession:

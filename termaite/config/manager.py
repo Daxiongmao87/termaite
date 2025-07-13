@@ -1,33 +1,33 @@
 """Configuration manager for termaite."""
 
-from typing import Dict, Any, Optional, Tuple
-from pathlib import Path
-import os
-import sys
-import json
-import hashlib
 import datetime
-import tempfile
+import hashlib
+import json
+import os
 import shutil
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
 
 import yaml
 
 from ..constants import (
     CONFIG_DIR,
     CONFIG_FILE,
+    DEFAULT_ALLOW_CLARIFYING_QUESTIONS,
+    DEFAULT_COMMAND_TIMEOUT,
+    DEFAULT_COMPACTION_THRESHOLD,
+    DEFAULT_ENABLE_DEBUG,
+    DEFAULT_ENDPOINT,
+    DEFAULT_MAX_CONTEXT_TOKENS,
+    DEFAULT_OPERATION_MODE,
+    OPERATION_MODES,
     PAYLOAD_FILE,
     RESPONSE_PATH_FILE,
-    DEFAULT_ENDPOINT,
-    DEFAULT_COMMAND_TIMEOUT,
-    DEFAULT_OPERATION_MODE,
-    DEFAULT_ENABLE_DEBUG,
-    DEFAULT_ALLOW_CLARIFYING_QUESTIONS,
-    OPERATION_MODES,
-    DEFAULT_MAX_CONTEXT_TOKENS,
-    DEFAULT_COMPACTION_THRESHOLD,
 )
+from ..utils.helpers import format_template_string, get_current_context, safe_file_write
 from ..utils.logging import logger
-from ..utils.helpers import get_current_context, format_template_string, safe_file_write
 from .templates import CONFIG_TEMPLATE, PAYLOAD_TEMPLATE, RESPONSE_PATH_TEMPLATE
 
 
@@ -79,9 +79,9 @@ class ConfigManager:
             if not self.config_file.exists():
                 context = get_current_context()
                 context["tool_instructions_addendum"] = "{tool_instructions_addendum}"
-                context["ALLOW_CLARIFYING_QUESTIONS"] = (
-                    False  # Set to False to exclude CLARIFY_USER
-                )
+                context[
+                    "ALLOW_CLARIFYING_QUESTIONS"
+                ] = False  # Set to False to exclude CLARIFY_USER
 
                 formatted_config = format_template_string(CONFIG_TEMPLATE, **context)
                 if safe_file_write(
