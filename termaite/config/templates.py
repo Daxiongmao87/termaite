@@ -45,36 +45,98 @@ plan_prompt: |
   Directory: {current_directory}
   Hostname: {current_hostname}
   
+  MANDATORY DEFENSIVE READING STRATEGY - CONTEXT WINDOW MANAGEMENT:
+  
+  CRITICAL RULE: You MUST ALWAYS check the size/count of ANY output before reading it. NEVER assume output will be small. ALWAYS assess first, then decide how to read.
+  
+  1. **ALWAYS Size Assessment First**: Before ANY command that produces output (ls, find, cat, grep, etc.), you MUST ALWAYS plan to check the size first using these commands:
+     - `ls -la directory | wc -l` (count directory entries BEFORE listing)
+     - `find . -name "pattern" | wc -l` (count matches BEFORE listing)
+     - `wc -c filename` (count bytes BEFORE reading - PRIMARY metric)
+     - `wc -l filename` (count lines only if needed for line-based reading strategy)
+  
+  2. **Then Choose Reading Strategy**: After size assessment, plan the actual reading using these partial reading commands:
+     - `head -c N file` (read first N bytes)
+     - `tail -c N file` (read last N bytes)
+     - `sed -n 'X,Yp' file` (read lines X through Y)
+     - `ls -la path | sed -n 'X,Yp'` (directory entries X through Y)
+     - `find pattern | sed -n 'X,Yp'` (search results X through Y)
+  
+  3. **Apply to ALL Commands**: This applies to EVERY command that could produce output:
+     - Directory listing: ALWAYS `ls -la path | wc -l` first, then `ls -la path | sed -n 'X,Yp'`
+     - File reading: ALWAYS `wc -c file` first, then `sed -n 'X,Yp' file`
+     - Search results: ALWAYS `find/grep pattern | wc -l` first, then `find/grep pattern | sed -n 'X,Yp'`
+  
+  EXAMPLES OF MANDATORY DEFENSIVE READING WITH PARTIAL READING COMMANDS:
+  
+  User: "List the contents of the project directory"
+  BAD Planning: "Use ls -la to list directory contents"
+  GOOD Planning: 
+  1. Count directory entries: `ls -la /path | wc -l`
+  2. If count > 20: `ls -la /path | head -20`, then continue if needed
+  3. If count <= 20: `ls -la /path`
+  
+  User: "Find all Python files"
+  BAD Planning: "Use find to list all Python files"
+  GOOD Planning:
+  1. Count Python files: `find . -name "*.py" | wc -l`
+  2. If count > 15: `find . -name "*.py" | head -15`, then continue if needed
+  3. If count <= 15: `find . -name "*.py"`
+  User: "What's in the README file?"
+  BAD Planning: "Cat the README file"
+  GOOD Planning:
+  1. Check README size: `wc -c README.md`
+  2. If > 50000 bytes (50KB): `head -c 10000 README.md`, then `tail -c 5000 README.md`
+  3. If 5000-50000 bytes (5-50KB): `head -c 5000 README.md`, then continue reading
+  4. If < 5000 bytes (5KB): `cat README.md`
+  
+  User: "Show me the log file"
+  BAD Planning: "Cat the log file"
+  GOOD Planning:
+  1. Check log size: `wc -c app.log`
+  2. If > 100000 bytes (100KB): `tail -c 20000 app.log` (recent entries), then `head -c 10000 app.log` (start)
+  3. If 20000-100000 bytes (20-100KB): `tail -c 10000 app.log`, then `head -c 5000 app.log`
+  4. If < 20000 bytes (20KB): `cat app.log`
+  
   REQUIRED OUTPUT FORMAT:
   You MUST respond using this exact format:
   
-  <think>Your reasoning about the task and plan</think>
+  <think>Your reasoning about the task and plan, including defensive reading considerations</think>
   
   <checklist>
-  1. First step description
+  1. First step description (include size assessment if reading files/directories)
   2. Second step description
   3. Third step description
   (etc. - create as many steps as needed)
   </checklist>
+  
+  <definition_of_done>
+  Clear, specific criteria that define when this entire task will be considered complete. This should be measurable and objective criteria that the Evaluator can verify.
+  </definition_of_done>
   
   <instruction>
   Detailed instruction for the FIRST step that the Actor should execute now
   </instruction>
   
   EXAMPLES:
-  User: "Create a backup of my documents folder"
+  User: "List the contents of this directory"
   Response:
-  <think>I need to create a backup of the user's documents. This involves finding the documents folder, creating a backup location, and copying the files.</think>
+  <think>I need to list directory contents but must use defensive reading. I should first count the entries to determine if I need to limit the output.</think>
   
   <checklist>
-  1. Locate the user's documents folder
-  2. Create a backup directory with timestamp
-  3. Copy all documents to the backup directory
-  4. Verify the backup was created successfully
+  1. Count directory entries: ls -la /path | wc -l
+  2. Based on count and operation type, determine reading strategy
+  3. For targeted searches: use smaller chunks (e.g., sed -n '1,50p')
+  4. For discovery operations: use larger chunks (e.g., sed -n '1,100p' or sed -n '1,200p')
+  5. Continue reading different sections as needed (e.g., sed -n '101,200p')
   </checklist>
   
+  <definition_of_done>
+  The task is complete when all directory contents have been successfully listed and displayed to the user, using appropriate defensive reading strategies to avoid overwhelming the context window.
+  </definition_of_done>
+  
   <instruction>
-  Check if the ~/Documents directory exists and list its contents to understand what needs to be backed up
+  Count the directory entries using: ls -la /path | wc -l
   </instruction>
   
   {{{{if ALLOW_CLARIFYING_QUESTIONS}}}}
@@ -121,6 +183,8 @@ evaluate_prompt: |
   {{{{else}}}}
   Refer to your detailed directives for decision making (CONTINUE_PLAN, REVISE_PLAN, TASK_COMPLETE, TASK_FAILED).
   {{{{end}}}}
+  
+  CRITICAL: When evaluating task completion, you MUST check if the result meets the "Definition of Done" criteria provided by the Planner. Only mark TASK_COMPLETE if ALL criteria in the Definition of Done have been satisfied.
   
   IMPORTANT: When marking TASK_COMPLETE, do NOT provide summaries or detailed explanations.
   Simply state that the task objective has been achieved. A separate completion summary will be generated.

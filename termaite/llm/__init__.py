@@ -13,6 +13,7 @@ from .parsers import (
     parse_llm_summary,
     parse_llm_thought,
     parse_suggested_command,
+    parse_definition_of_done,
     validate_generated_prompt_files,
 )
 from .payload import PayloadBuilder, create_payload_builder
@@ -28,6 +29,7 @@ __all__ = [
     "parse_llm_instruction",
     "parse_llm_decision",
     "parse_llm_summary",
+    "parse_definition_of_done",
     "extract_decision_type_and_message",
     "parse_checklist_items",
     "extract_response_content",

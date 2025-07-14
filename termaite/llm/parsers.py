@@ -43,6 +43,12 @@ def parse_llm_summary(llm_output: str) -> str:
     return match.group(1).strip() if match else ""
 
 
+def parse_definition_of_done(llm_output: str) -> str:
+    """Extract the definition of done from <definition_of_done> tags."""
+    match = re.search(r"<definition_of_done>(.*?)</definition_of_done>", llm_output, re.DOTALL)
+    return match.group(1).strip() if match else ""
+
+
 def extract_decision_type_and_message(decision_text: str) -> tuple[str, str]:
     """Extract decision type and message from decision text.
 

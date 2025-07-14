@@ -22,3 +22,4 @@
                                 -rw-rw-r-- 1 patrick patrick 1087 Jul 12 23:37 idea.md
                                 drwxrwxr-x 1 patrick patrick    0 Jul 13 04:04 .termaite
 ```
+- Display the amount of context remaining before compaction in percentage.  This should be always visible, even during agentic output

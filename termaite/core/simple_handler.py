@@ -69,10 +69,10 @@ class SimpleHandler:
         Returns:
             True if request handled successfully, False otherwise
         """
-        # Check and compact context if needed
+        # Compact context before LLM call
         pwd_hash = hashlib.sha256(os.getcwd().encode("utf-8")).hexdigest()
         self.context_compactor.check_and_compact_context(pwd_hash)
-
+        
         # Get LLM response for simple mode
         payload = self.payload_builder.prepare_payload("simple", user_prompt)
         if not payload:
@@ -230,6 +230,10 @@ Command output/error:
 
 Please explain what went wrong and suggest possible solutions."""
 
+        # Compact context before LLM call
+        pwd_hash = hashlib.sha256(os.getcwd().encode("utf-8")).hexdigest()
+        self.context_compactor.check_and_compact_context(pwd_hash)
+        
         # Get LLM explanation of the error
         payload = self.payload_builder.prepare_payload("simple", error_context)
         if payload:
