@@ -45,7 +45,9 @@ def parse_llm_summary(llm_output: str) -> str:
 
 def parse_definition_of_done(llm_output: str) -> str:
     """Extract the definition of done from <definition_of_done> tags."""
-    match = re.search(r"<definition_of_done>(.*?)</definition_of_done>", llm_output, re.DOTALL)
+    match = re.search(
+        r"<definition_of_done>(.*?)</definition_of_done>", llm_output, re.DOTALL
+    )
     return match.group(1).strip() if match else ""
 
 

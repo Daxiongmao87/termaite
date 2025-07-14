@@ -68,10 +68,10 @@ plan_prompt: |
      - Search results: ALWAYS `find/grep pattern | wc -l` first, then `find/grep pattern | sed -n 'X,Yp'`
   
   EXAMPLES OF MANDATORY DEFENSIVE READING WITH PARTIAL READING COMMANDS:
-  
+
   User: "List the contents of the project directory"
   BAD Planning: "Use ls -la to list directory contents"
-  GOOD Planning: 
+  GOOD Planning:
   1. Count directory entries: `ls -la /path | wc -l`
   2. If count > 20: `ls -la /path | head -20`, then continue if needed
   3. If count <= 20: `ls -la /path`

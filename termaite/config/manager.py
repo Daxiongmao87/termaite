@@ -79,9 +79,9 @@ class ConfigManager:
             if not self.config_file.exists():
                 context = get_current_context()
                 context["tool_instructions_addendum"] = "{tool_instructions_addendum}"
-                context["ALLOW_CLARIFYING_QUESTIONS"] = (
-                    False  # Set to False to exclude CLARIFY_USER
-                )
+                context[
+                    "ALLOW_CLARIFYING_QUESTIONS"
+                ] = False  # Set to False to exclude CLARIFY_USER
 
                 formatted_config = format_template_string(CONFIG_TEMPLATE, **context)
                 if safe_file_write(

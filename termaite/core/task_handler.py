@@ -183,7 +183,7 @@ class TaskHandler:
             # Compact context before LLM call
             pwd_hash = hashlib.sha256(os.getcwd().encode("utf-8")).hexdigest()
             self.context_compactor.check_and_compact_context(pwd_hash)
-            
+
             # Get LLM response for planning
             payload = self.payload_builder.prepare_payload("plan", context)
             if not payload:
@@ -241,7 +241,9 @@ class TaskHandler:
                 if state.planner_summary:
                     logger.plan_agent(f"[Planner Summary]: {state.planner_summary}")
                 if state.definition_of_done:
-                    logger.plan_agent(f"[Definition of Done]: {state.definition_of_done}")
+                    logger.plan_agent(
+                        f"[Definition of Done]: {state.definition_of_done}"
+                    )
                 logger.plan_agent(f"[Planner Checklist]:\n{state.current_plan}")
                 logger.plan_agent(f"[Next Instruction]: {state.current_instruction}")
 
@@ -294,7 +296,7 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
             # Compact context before LLM call
             pwd_hash = hashlib.sha256(os.getcwd().encode("utf-8")).hexdigest()
             self.context_compactor.check_and_compact_context(pwd_hash)
-            
+
             # Get LLM response for action
             payload = self.payload_builder.prepare_payload("action", context)
             if not payload:
@@ -427,7 +429,7 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
             # Compact context before LLM call
             pwd_hash = hashlib.sha256(os.getcwd().encode("utf-8")).hexdigest()
             self.context_compactor.check_and_compact_context(pwd_hash)
-            
+
             # Get LLM response for evaluation
             payload = self.payload_builder.prepare_payload("evaluate", current_context)
             if not payload:
@@ -494,7 +496,7 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
         elif decision_type == "CONTINUE_PLAN":
             logger.eval_agent(f"Evaluator: CONTINUE_PLAN. {message}")
             state.step_index += 1
-            
+
             # Build context for the planning phase to get next instruction
             next_context = (
                 f"Original request: '{original_prompt}'.\n"
@@ -589,11 +591,13 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
             f"User's original request: '{original_prompt}'\n\n"
             f"Current Plan Checklist (if available):\n{state.current_plan}\n\n"
         )
-        
+
         # Add definition of done for task completion criteria
         if state.definition_of_done:
-            context += f"Definition of Done for this task:\n{state.definition_of_done}\n\n"
-            
+            context += (
+                f"Definition of Done for this task:\n{state.definition_of_done}\n\n"
+            )
+
         context += (
             f"Instruction that was attempted: '{state.current_instruction}'\n\n"
             f"Action Taken by Actor:\n{state.last_action_taken}\n\n"
@@ -630,7 +634,7 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
         # Compact context before LLM call
         pwd_hash = hashlib.sha256(os.getcwd().encode("utf-8")).hexdigest()
         self.context_compactor.check_and_compact_context(pwd_hash)
-        
+
         # Get completion summary from LLM
         payload = self.payload_builder.prepare_payload(
             "completion_summary", summary_context

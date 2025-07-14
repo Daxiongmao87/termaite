@@ -1,6 +1,5 @@
 """Command permissions and authorization for termaite."""
 
-import hashlib
 import json
 import os
 import re
@@ -191,13 +190,14 @@ class CommandPermissionManager:
 
         # Make direct LLM call for description
         try:
+            import hashlib
             from ..llm.payload import create_payload_builder
             from ..core.context_compactor import create_context_compactor
 
             payload_builder = create_payload_builder(
                 config, Path(config.get("payload_file", "payload.json"))
             )
-            
+
             # Compact context before LLM call
             context_compactor = create_context_compactor(config, llm_client)
             pwd_hash = hashlib.sha256(os.getcwd().encode("utf-8")).hexdigest()
