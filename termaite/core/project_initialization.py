@@ -158,15 +158,17 @@ class ProjectInitializationTask:
 
     def _create_investigation_task(self) -> str:
         """Create Step 1: Independent agentic task to investigate the project."""
-        return f"""Investigate the project directory {self.initial_working_directory} to understand its key characteristics for customizing AI agent prompts.
+        return f"""Quickly investigate the project directory {self.initial_working_directory} to identify its type for customizing AI agent prompts.
 
-Goals:
-- Understand the project's structure, purpose, programming language, and type
-- Identify key files, documentation, and configuration
-- Determine project type (web app, game, CLI tool, library, etc.)
-- Gather information needed to customize AI agent behavior
+FOCUS ONLY ON:
+1. List directory contents with 'ls -la {self.initial_working_directory}'
+2. Check for key files indicating project type:
+   - README.md or README.txt (read first 20 lines)
+   - package.json, pyproject.toml, Cargo.toml, or similar (read first 10 lines)
+   - Primary source directory structure
 
-Start by listing directory contents, then read key documentation files."""
+GOAL: Quickly determine if this is a Python library, web app, CLI tool, game, or other project type.
+TIME LIMIT: Complete investigation in under 1 minute. Be efficient and focused."""
 
     def _create_prompt_generation_task(self, investigation_summary: str) -> str:
         """Create Step 2: Independent agentic task to generate the three prompt files."""
@@ -177,27 +179,20 @@ Start by listing directory contents, then read key documentation files."""
 {investigation_summary}
 ---
 
-**Your Task:**
+TASK: Create exactly 3 files with behavioral guidance.
 
-1.  **Identify Project Type:** From the summary, determine the project's archetype (e.g., Web Application, CLI Tool, Software Library, etc.).
+DEFINITION OF DONE: Task complete only when ALL THREE files exist in .termaite/ directory:
+- .termaite/PLANNER.md
+- .termaite/ACTOR.md  
+- .termaite/EVALUATOR.md
 
-2.  **Generate Guidance for that Type:** Based on the identified project **type**, write a short, high-level paragraph of behavioral guidance for EACH of the three agent roles (Planner, Actor, Evaluator). This guidance must be general for the project **type**. To guide your writing, consider:
-    *   **Planner:** What are the typical phases or components to consider when planning for this **type** of project?
-    *   **Actor:** What are the common tools, commands, and workflows used for this **type** of project?
-    *   **Evaluator:** What defines a high-quality result for this **type** of project?
+STEPS:
+1. Identify project type from summary
+2. Create all 3 files using: cat > .termaite/FILENAME.md << 'EOF'
+3. Each file needs "## Project-Specific [Role] Guidance" header
+4. Verify all 3 files exist before considering task complete
 
-3.  **Create Three Files:**
-    Create the following three files in the `.termaite/` directory within the CURRENT WORKING DIRECTORY. Use full relative paths from the current directory. Each file's content should be only the guidance paragraph you generated for that role, starting with a "## Project-Specific [Role] Guidance" heading.
-
-    *   `.termaite/PLANNER.md`
-    *   `.termaite/ACTOR.md`  
-    *   `.termaite/EVALUATOR.md`
-    
-    IMPORTANT: Use the current working directory path, NOT the home directory. All files must be created in `./termaite/` relative to the current working directory.
-
-Do not include any project-specific file names or the investigation summary in the final output. Do not use a rigid format. Your goal is to provide genuinely useful, high-level advice for the identified project **type**.
-
-Begin.
+CRITICAL: Must create ALL 3 files. Task is not complete until all 3 exist.
 """
 
     def _extract_investigation_summary(

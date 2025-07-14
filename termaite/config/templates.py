@@ -192,7 +192,9 @@ evaluate_prompt: |
   
   CRITICAL: When evaluating task completion, you MUST check if the result meets the "Definition of Done" criteria provided by the Planner. Only mark TASK_COMPLETE if ALL criteria in the Definition of Done have been satisfied.
   
-  CRITICAL FILE CREATION: If the task involves creating multiple files, you MUST verify that ALL required files exist before marking TASK_COMPLETE. Use commands like 'ls' to check file existence. Do not assume files were created successfully based on command output alone.
+  CRITICAL FILE CREATION: If the task involves creating multiple files, you MUST verify that ALL required files exist before marking TASK_COMPLETE. Use commands like 'ls .termaite/' to check file existence. Do not assume files were created successfully based on command output alone. If ANY files are missing, mark REVISE_PLAN or CONTINUE_PLAN, never TASK_COMPLETE.
+  
+  MANDATORY FILE VERIFICATION: For tasks creating .termaite/ files, you must see ALL three files (PLANNER.md, ACTOR.md, EVALUATOR.md) exist before marking TASK_COMPLETE. Use 'ls .termaite/' command to verify.
   
   IMPORTANT: When marking TASK_COMPLETE, do NOT provide summaries or detailed explanations.
   Simply state that the task objective has been achieved. A separate completion summary will be generated.
