@@ -46,3 +46,5 @@ goblin_*.txt
 *.log
 temp_*
 test_temp_*
+
+test_project/

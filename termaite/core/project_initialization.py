@@ -44,34 +44,79 @@ class ProjectInitializationTask:
             # Add necessary investigation commands temporarily
             self._add_investigation_commands()
 
-            # STEP 1: Independent agentic investigation task
+            # STEP 1: Independent agentic investigation task with retry until success
             logger.system("🔍 Step 1: Running independent agentic investigation...")
-            investigation_task = self._create_investigation_task()
-            (
-                investigation_success,
-                investigation_context,
-            ) = self.task_handler.handle_task(investigation_task)
+            investigation_attempt = 0
+            investigation_summary = None
 
-            if not investigation_success:
-                logger.error("Step 1 (investigation) failed")
-                return False
+            while not investigation_summary:
+                investigation_attempt += 1
+                if investigation_attempt > 1:
+                    logger.system(
+                        f"🔍 Step 1: Retrying investigation (Attempt {investigation_attempt})..."
+                    )
 
-            # Extract investigation summary from task handler results
-            investigation_summary = self._extract_investigation_summary(
-                investigation_context
-            )
-            if not investigation_summary:
-                logger.error("Failed to extract investigation summary from Step 1")
-                return False
+                investigation_task = self._create_investigation_task()
+                (
+                    investigation_success,
+                    investigation_context,
+                ) = self.task_handler.handle_task(investigation_task)
 
-            # STEP 2: Independent agentic prompt generation task
+                if investigation_success:
+                    # Extract investigation summary from task handler results
+                    investigation_summary = self._extract_investigation_summary(
+                        investigation_context
+                    )
+                    if investigation_summary:
+                        logger.system(
+                            f"✅ Step 1: Investigation completed successfully on attempt {investigation_attempt}"
+                        )
+                        break
+                    else:
+                        logger.warning(
+                            f"⚠️  Step 1: Investigation completed but summary extraction failed (Attempt {investigation_attempt})"
+                        )
+                else:
+                    logger.warning(
+                        f"⚠️  Step 1: Investigation failed, retrying... (Attempt {investigation_attempt})"
+                    )
+
+                # Brief pause before retry to avoid hammering the LLM
+                import time
+
+                time.sleep(1)
+
+            # STEP 2: Independent agentic prompt generation task with retry until success
             logger.system("📝 Step 2: Running independent agentic prompt generation...")
-            generation_task = self._create_prompt_generation_task(investigation_summary)
-            generation_success, _ = self.task_handler.handle_task(generation_task)
+            generation_attempt = 0
+            generation_success = False
 
-            if not generation_success:
-                logger.error("Step 2 (prompt generation) failed")
-                return False
+            while not generation_success:
+                generation_attempt += 1
+                if generation_attempt > 1:
+                    logger.system(
+                        f"📝 Step 2: Retrying prompt generation (Attempt {generation_attempt})..."
+                    )
+
+                generation_task = self._create_prompt_generation_task(
+                    investigation_summary
+                )
+                generation_success, _ = self.task_handler.handle_task(generation_task)
+
+                if generation_success:
+                    logger.system(
+                        f"✅ Step 2: Prompt generation completed successfully on attempt {generation_attempt}"
+                    )
+                    break
+                else:
+                    logger.warning(
+                        f"⚠️  Step 2: Prompt generation failed, retrying... (Attempt {generation_attempt})"
+                    )
+
+                # Brief pause before retry to avoid hammering the LLM
+                import time
+
+                time.sleep(1)
 
             # Validate the generated files (agent should have created them)
             termaite_dir = Path(self.initial_working_directory) / ".termaite"

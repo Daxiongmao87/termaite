@@ -225,12 +225,15 @@ class PayloadBuilder:
     def _load_customized_prompt(self, phase: str, termaite_dir: Path) -> Optional[str]:
         """Load a customized prompt from the .termaite directory.
 
+        These files contain project-specific guidance that should be appended
+        to the default agent templates, not replace them entirely.
+
         Args:
             phase: The phase name (plan, action, evaluate, etc.)
             termaite_dir: Path to the .termaite directory
 
         Returns:
-            The customized prompt content or None if not found
+            Enhanced prompt with project context or None if not found
         """
         # Map phase names to file names
         phase_file_map = {
@@ -247,12 +250,37 @@ class PayloadBuilder:
         try:
             if prompt_file.exists():
                 with open(prompt_file, "r", encoding="utf-8") as f:
-                    content = f.read().strip()
-                if content:
-                    logger.debug(f"Loaded customized prompt from {prompt_file}")
-                    return content
+                    project_guidance = f.read().strip()
+
+                if project_guidance:
+                    # Load the default template first
+                    import yaml
+                    from ..config.templates import CONFIG_TEMPLATE
+
+                    try:
+                        default_config = yaml.safe_load(CONFIG_TEMPLATE)
+                        template_map = {
+                            "plan": default_config.get("plan_prompt", ""),
+                            "action": default_config.get("action_prompt", ""),
+                            "evaluate": default_config.get("evaluate_prompt", ""),
+                        }
+
+                        base_prompt = template_map.get(phase, "")
+                        if base_prompt:
+                            # Append project guidance to the base template
+                            enhanced_prompt = f"{base_prompt}\n\nPROJECT-SPECIFIC GUIDANCE:\n{project_guidance}"
+                            logger.debug(
+                                f"Enhanced {phase} prompt with project guidance from {prompt_file}"
+                            )
+                            return enhanced_prompt
+
+                    except Exception as e:
+                        logger.warning(
+                            f"Failed to enhance prompt with project guidance: {e}"
+                        )
+
         except Exception as e:
-            logger.warning(f"Failed to load customized prompt from {prompt_file}: {e}")
+            logger.warning(f"Failed to load project guidance from {prompt_file}: {e}")
 
         return None
 

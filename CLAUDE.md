@@ -224,3 +224,7 @@ When making architectural changes, update both:
 The `/init` command enables auto-customization of agent prompts by investigating the current project directory and generating context-aware system prompts stored in `.termaite/`.
 
 This allows the same termaite installation to work effectively across different types of projects (software, documents, research, etc.) by understanding project-specific patterns and conventions.
+
+## Memories
+
+- termaite is nondeterministic. SET TIMEOUTS TO BE LONG IF NECESSARY, 10+ MINUTES, ESPECIALLY FOR AGENTIC (-a) COMMANDS
