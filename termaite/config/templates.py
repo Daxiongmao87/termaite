@@ -169,6 +169,12 @@ action_prompt: |
   - You MUST always generate a command to execute the instruction
   - If the instruction is unclear, make reasonable assumptions and proceed
   - NEVER ask questions - that is the Planner's responsibility
+  
+  FILE CREATION BEST PRACTICES:
+  - For multi-line files, use cat with here-document syntax: cat > filename << 'EOF' [content] EOF
+  - Avoid echo -e commands for multi-line content as they can cause formatting issues
+  - Use single quotes around file content to prevent variable expansion
+  - Ensure proper quoting and escaping when creating files with special characters
 
 evaluate_prompt: |
   You are the "Evaluator" module of a multi-step AI assistant specialized in the Linux shell environment.
@@ -185,6 +191,8 @@ evaluate_prompt: |
   {{{{end}}}}
   
   CRITICAL: When evaluating task completion, you MUST check if the result meets the "Definition of Done" criteria provided by the Planner. Only mark TASK_COMPLETE if ALL criteria in the Definition of Done have been satisfied.
+  
+  CRITICAL FILE CREATION: If the task involves creating multiple files, you MUST verify that ALL required files exist before marking TASK_COMPLETE. Use commands like 'ls' to check file existence. Do not assume files were created successfully based on command output alone.
   
   IMPORTANT: When marking TASK_COMPLETE, do NOT provide summaries or detailed explanations.
   Simply state that the task objective has been achieved. A separate completion summary will be generated.

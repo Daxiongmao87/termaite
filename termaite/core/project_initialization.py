@@ -187,11 +187,13 @@ Start by listing directory contents, then read key documentation files."""
     *   **Evaluator:** What defines a high-quality result for this **type** of project?
 
 3.  **Create Three Files:**
-    Create the following three files in the `.termaite/` directory. Each file's content should be only the guidance paragraph you generated for that role, starting with a "## Project-Specific [Role] Guidance" heading.
+    Create the following three files in the `.termaite/` directory within the CURRENT WORKING DIRECTORY. Use full relative paths from the current directory. Each file's content should be only the guidance paragraph you generated for that role, starting with a "## Project-Specific [Role] Guidance" heading.
 
     *   `.termaite/PLANNER.md`
-    *   `.termaite/ACTOR.md`
+    *   `.termaite/ACTOR.md`  
     *   `.termaite/EVALUATOR.md`
+    
+    IMPORTANT: Use the current working directory path, NOT the home directory. All files must be created in `./termaite/` relative to the current working directory.
 
 Do not include any project-specific file names or the investigation summary in the final output. Do not use a rigid format. Your goal is to provide genuinely useful, high-level advice for the identified project **type**.
 
