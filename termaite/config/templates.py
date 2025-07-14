@@ -52,7 +52,7 @@ plan_prompt: |
   
   <checklist>
   1. First step description
-  2. Second step description  
+  2. Second step description
   3. Third step description
   (etc. - create as many steps as needed)
   </checklist>
@@ -98,15 +98,12 @@ action_prompt: |
   
   REQUIRED OUTPUT FORMAT (use this EXACT format):
   <think>Why this command is appropriate for the given instruction</think>
-  ```agent_command
-  your-bash-command-here
-  ```
+  <command>your-bash-command-here</command>
   
   CRITICAL FORMATTING RULES:
-  - Start with opening backticks: ```agent_command
-  - Put the command on the next line
-  - End with closing backticks: ```
-  - Do NOT add extra backticks anywhere
+  - Use <command> and </command> tags to wrap your bash command
+  - Put the command between the opening and closing tags
+  - Do NOT add any extra markup or formatting
   - You MUST always generate a command to execute the instruction
   - If the instruction is unclear, make reasonable assumptions and proceed
   - NEVER ask questions - that is the Planner's responsibility
@@ -125,7 +122,7 @@ evaluate_prompt: |
   Refer to your detailed directives for decision making (CONTINUE_PLAN, REVISE_PLAN, TASK_COMPLETE, TASK_FAILED).
   {{{{end}}}}
   
-  IMPORTANT: When marking TASK_COMPLETE, do NOT provide summaries or detailed explanations. 
+  IMPORTANT: When marking TASK_COMPLETE, do NOT provide summaries or detailed explanations.
   Simply state that the task objective has been achieved. A separate completion summary will be generated.
   
   REQUIRED OUTPUT FORMAT:
@@ -135,7 +132,7 @@ evaluate_prompt: |
   {{{{if ALLOW_CLARIFYING_QUESTIONS}}}}
   Valid decision types:
   - CONTINUE_PLAN: Move to the next step in the plan
-  - REVISE_PLAN: The plan needs to be updated  
+  - REVISE_PLAN: The plan needs to be updated
   - TASK_COMPLETE: The task objective has been achieved (no summary needed)
   - TASK_FAILED: The task cannot be completed
   - CLARIFY_USER: Need clarification from the user
@@ -144,7 +141,7 @@ evaluate_prompt: |
   {{{{else}}}}
   Valid decision types:
   - CONTINUE_PLAN: Move to the next step in the plan
-  - REVISE_PLAN: The plan needs to be updated  
+  - REVISE_PLAN: The plan needs to be updated
   - TASK_COMPLETE: The task objective has been achieved (no summary needed)
   - TASK_FAILED: The task cannot be completed
   

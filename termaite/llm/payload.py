@@ -96,7 +96,32 @@ class PayloadBuilder:
             logger.error(f"Invalid phase '{phase}' provided to prepare_payload.")
             return None
 
-        return phase_map[phase]
+        prompt = phase_map[phase]
+
+        # If config prompt is empty or minimal, fall back to default template
+        if not prompt or prompt.strip() == "":
+            # Load default templates from YAML structure
+            import yaml
+            from ..config.templates import CONFIG_TEMPLATE
+
+            try:
+                default_config = yaml.safe_load(CONFIG_TEMPLATE)
+                template_map = {
+                    "plan": default_config.get("plan_prompt", ""),
+                    "action": default_config.get("action_prompt", ""),
+                    "evaluate": default_config.get("evaluate_prompt", ""),
+                    "completion_summary": default_config.get(
+                        "completion_summary_prompt", ""
+                    ),
+                    "simple": default_config.get("simple_prompt", ""),
+                }
+                prompt = template_map.get(phase, "")
+                if prompt:
+                    logger.debug(f"Using default template for {phase} phase")
+            except Exception as e:
+                logger.warning(f"Failed to load default template for {phase}: {e}")
+
+        return prompt
 
     def _get_tool_instructions(self, phase: str) -> str:
         """Get tool instructions addendum for the given phase."""

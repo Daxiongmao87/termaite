@@ -282,9 +282,9 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
 
     def _execute_action_phase(self, context: str, state: TaskState) -> TaskStatus:
         """Execute the action phase with retry logic for command parsing."""
-        max_retries = self.config.get("action_agent_retries", 3)
-
-        for attempt in range(max_retries):
+        attempt = 0
+        while True:
+            attempt += 1
             # Get LLM response for action
             payload = self.payload_builder.prepare_payload("action", context)
             if not payload:
@@ -298,7 +298,7 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
 
             # Append to context for history
             self.config_manager.append_context(
-                f"Actor Input (Attempt {attempt + 1}): {context}", response
+                f"Actor Input (Attempt {attempt}): {context}", response
             )
 
             # Parse LLM response
@@ -317,34 +317,25 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
 
             # If no command, prepare for retry
             error_message = (
-                f"Action agent response did not contain a valid `<command>...</command>` block. "
-                f"This is a format violation. You MUST provide a command."
+                "Action agent response did not contain a valid `<command>...</command>` block. "
+                "This is a format violation. You MUST provide a command."
             )
             logger.warning(
-                f"Action agent failed to provide a command (Attempt {attempt + 1}/{max_retries}). "
+                f"Action agent failed to provide a command (Attempt {attempt}). "
                 f"Response: {response}"
             )
+            # Display the failure to the user
+            print(
+                f"\n{CLR_BOLD_GREEN}[Warning] Action agent failed to provide a command (Attempt {attempt}){CLR_RESET}"
+            )
+            print(f"{CLR_GREEN}Response: {response}{CLR_RESET}\n")
 
-            if attempt < max_retries - 1:
-                # Re-prompt with corrective feedback
-                context = (
-                    f"{context}\n\nPREVIOUS ATTEMPT FAILED. "
-                    f"Your last response was invalid. Reason: {error_message}\n"
-                    "Please correct your response and provide a valid command."
-                )
-            else:
-                # Final attempt failed
-                logger.error(
-                    f"Action agent failed to provide a command after {max_retries} attempts."
-                )
-                state.last_action_taken = "Action agent error: no command provided"
-                state.last_action_result = (
-                    f"Action agent response contained no `<command>` block after {max_retries} retries. "
-                    f"Final response: {response}"
-                )
-                return TaskStatus.FAILED
-
-        return TaskStatus.FAILED  # Should not be reached, but as a fallback
+            # Re-prompt with corrective feedback
+            context = (
+                f"{context}\n\nPREVIOUS ATTEMPT FAILED. "
+                f"Your last response was invalid. Reason: {error_message}\n"
+                "Please correct your response and provide a valid command."
+            )
 
     def _handle_command_suggestion(self, command: str, state: TaskState) -> TaskStatus:
         """Handle a command suggestion from the action agent."""
@@ -372,7 +363,7 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
             elif operation_mode in ["gremlin", "goblin"]:
                 # Handle dynamic permission requests
                 if operation_mode == "goblin":
-                    logger.system(f"Goblin Mode: Auto-allowing command")
+                    logger.system("Goblin Mode: Auto-allowing command")
                     allowed = True
                 else:  # gremlin mode
                     (
@@ -419,10 +410,10 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
         self, context: str, state: TaskState, original_prompt: str
     ) -> tuple[TaskStatus, str]:
         """Execute the evaluation phase with retry logic for parsing."""
-        max_retries = self.config.get("eval_agent_retries", 3)
+        attempt = 0
         current_context = context
-
-        for attempt in range(max_retries):
+        while True:
+            attempt += 1
             # Get LLM response for evaluation
             payload = self.payload_builder.prepare_payload("evaluate", current_context)
             if not payload:
@@ -436,7 +427,7 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
 
             # Append to context for history
             self.config_manager.append_context(
-                f"Evaluator Input (Attempt {attempt + 1}): {current_context}", response
+                f"Evaluator Input (Attempt {attempt}): {current_context}", response
             )
 
             # Parse LLM response
@@ -455,30 +446,24 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
 
                 decision_type, message = extract_decision_type_and_message(decision)
                 state.last_eval_decision = decision_type
-                return self._process_evaluation_decision(decision_type, message, state, original_prompt)
+                return self._process_evaluation_decision(
+                    decision_type, message, state, original_prompt
+                )
 
             # If no decision, prepare for retry
             error_message = (
                 "Response did not contain a valid `<decision>...</decision>` block."
             )
             logger.warning(
-                f"Evaluator failed to provide a decision (Attempt {attempt + 1}/{max_retries}). "
+                f"Evaluator failed to provide a decision (Attempt {attempt}). "
                 f"Reason: {error_message} Response: {response}"
             )
 
-            if attempt < max_retries - 1:
-                current_context = (
-                    f"{context}\n\nPREVIOUS ATTEMPT FAILED. "
-                    f"Your last response was invalid. Reason: {error_message}\n"
-                    "Please correct your response and provide a valid decision."
-                )
-            else:
-                logger.error(
-                    f"Evaluator failed to provide a valid decision after {max_retries} attempts."
-                )
-                return TaskStatus.FAILED, ""
-
-        return TaskStatus.FAILED, ""
+            current_context = (
+                f"{context}\n\nPREVIOUS ATTEMPT FAILED. "
+                f"Your last response was invalid. Reason: {error_message}\n"
+                "Please correct your response and provide a valid decision."
+            )
 
     def _process_evaluation_decision(
         self, decision_type: str, message: str, state: TaskState, original_prompt: str
@@ -561,7 +546,7 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
 
         else:
             logger.error(
-                f"Unknown decision from Evaluator: '{decision}'. Assuming task failed"
+                f"Unknown decision from Evaluator: '{decision_type}'. Assuming task failed"
             )
             return TaskStatus.FAILED, ""
 
@@ -634,7 +619,6 @@ You MUST correct your output. Your response MUST contain BOTH a `<checklist>...<
         # Parse and display the summary
         try:
             # Extract the summary content from between <summary> tags
-            import re
 
             summary_match = re.search(r"<summary>(.*?)</summary>", response, re.DOTALL)
             if summary_match:
