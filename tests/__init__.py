@@ -1,1 +1,1 @@
-# Test package for termaite
+# Tests package for termaite

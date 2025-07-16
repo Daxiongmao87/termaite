@@ -1,26 +1,7 @@
 """
-term.ai.te - LLM-powered shell assistant with multi-agent architecture.
-
-This package provides an intelligent command-line assistant that uses Large Language Models
-to understand natural language requests and execute shell commands safely through a
-multi-agent system (Plan, Action, Evaluation).
+Termaite - A Python-based terminal agent that uses bash commands as tool calls.
 """
 
-__version__ = "1.0.0"
-__author__ = "term.ai.te Team"
-
-from .config.manager import ConfigManager, create_config_manager
-
-# Main API imports
-from .core.application import TermAIte, create_application
-from .core.task_handler import TaskHandler, create_task_handler
-
-__all__ = [
-    "TermAIte",
-    "create_application",
-    "TaskHandler",
-    "create_task_handler",
-    "ConfigManager",
-    "create_config_manager",
-    "__version__",
-]
+__version__ = "0.1.0"
+__author__ = "Termaite Team"
+__description__ = "A Python-based terminal agent that uses bash commands as tool calls"

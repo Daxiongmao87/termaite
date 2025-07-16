@@ -1,266 +1,307 @@
-"""Tests for project initialization functionality."""
-
-import os
-import shutil
-import tempfile
-from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+"""
+Comprehensive tests for project initialization and context generation.
+"""
 
 import pytest
-
-from termaite.core.application import TermAIte, create_application
-from termaite.llm.payload import PayloadBuilder
-
-
-class TestProjectInitialization:
-    """Test the project initialization feature."""
-
-    def setup_method(self):
-        """Set up test environment."""
-        # Create a temporary directory for testing
-        self.test_dir = Path(tempfile.mkdtemp())
-        self.termaite_dir = self.test_dir / ".termaite"
-
-    def teardown_method(self):
-        """Clean up test environment."""
-        if self.test_dir.exists():
-            shutil.rmtree(self.test_dir)
-
-    @patch("termaite.core.application.create_config_manager")
-    @patch("termaite.core.application.create_task_handler")
-    @patch("termaite.core.application.create_simple_handler")
-    @patch("termaite.core.application.check_dependencies")
-    def test_show_init_tip_if_needed_no_termaite_dir(
-        self,
-        mock_check_deps,
-        mock_simple_handler,
-        mock_task_handler,
-        mock_config_manager,
-    ):
-        """Test that init tip is shown when no .termaite directory exists."""
-        # Setup mocks
-        mock_config_manager.return_value.config = {"enable_debug": False}
-        mock_config_manager.return_value.get_command_maps.return_value = ({}, {})
-
-        app = TermAIte(initial_working_directory=str(self.test_dir))
-
-        # The tip should be shown since no .termaite directory exists
-        with patch("termaite.utils.logging.logger.system") as mock_logger:
-            app._show_init_tip_if_needed()
-
-            # Verify that tip messages were logged
-            mock_logger.assert_any_call("💡 Tip: You're in a new project directory!")
-            mock_logger.assert_any_call(
-                "   Consider running '/init' to let the AI agents investigate"
-            )
-
-    @patch("termaite.core.application.create_config_manager")
-    @patch("termaite.core.application.create_task_handler")
-    @patch("termaite.core.application.create_simple_handler")
-    @patch("termaite.core.application.check_dependencies")
-    def test_show_init_tip_if_needed_with_termaite_dir(
-        self,
-        mock_check_deps,
-        mock_simple_handler,
-        mock_task_handler,
-        mock_config_manager,
-    ):
-        """Test that init tip is NOT shown when .termaite directory exists."""
-        # Setup mocks
-        mock_config_manager.return_value.config = {"enable_debug": False}
-        mock_config_manager.return_value.get_command_maps.return_value = ({}, {})
-
-        # Create .termaite directory
-        self.termaite_dir.mkdir()
-
-        app = TermAIte(initial_working_directory=str(self.test_dir))
-
-        # The tip should NOT be shown since .termaite directory exists
-        with patch("termaite.utils.logging.logger.system") as mock_logger:
-            app._show_init_tip_if_needed()
-
-            # Verify that no tip messages were logged
-            tip_calls = [
-                call for call in mock_logger.call_args_list if "💡 Tip:" in str(call)
-            ]
-            assert len(tip_calls) == 0
-
-    @patch(
-        "termaite.core.project_initialization.validate_generated_prompt_files",
-        return_value=(True, []),
-    )
-    @patch(
-        "termaite.core.project_initialization.ProjectInitializationTask._add_investigation_commands"
-    )
-    @patch("termaite.core.application.create_config_manager")
-    @patch("termaite.core.application.create_task_handler")
-    @patch("termaite.core.application.create_simple_handler")
-    @patch("termaite.core.application.check_dependencies")
-    def test_initialize_project_prompts_succeeds(
-        self,
-        mock_check_deps,
-        mock_simple_handler,
-        mock_task_handler,
-        mock_config_manager,
-        mock_add_commands,
-        mock_validate_files,
-    ):
-        """Test that initialize_project_prompts succeeds with proper mocking."""
-        # Setup mocks
-        mock_config_manager.return_value.config = {"enable_debug": False}
-        mock_config_manager.return_value.get_command_maps.return_value = ({}, {})
-
-        # Mock the task handler instance
-        mock_task_handler_instance = MagicMock()
-        mock_task_handler.return_value = mock_task_handler_instance
-
-        # This function will be the side effect for the handle_task calls
-        def mock_handle_task(task_prompt_str):
-            if "Investigate" in task_prompt_str:
-                return (True, "investigation summary")
-            # For the generation task, simulate file creation
-            else:
-                (self.termaite_dir / "PLANNER.md").write_text("Planner content")
-                (self.termaite_dir / "ACTOR.md").write_text("Actor content")
-                (self.termaite_dir / "EVALUATOR.md").write_text("Evaluator content")
-                return (True, "generation context")
-
-        mock_task_handler_instance.handle_task.side_effect = mock_handle_task
-
-        app = TermAIte(initial_working_directory=str(self.test_dir))
-
-        # Call initialize_project_prompts
-        result = app.initialize_project_prompts()
-
-        # Verify that the .termaite directory was created and result is True
-        assert self.termaite_dir.exists()
-        assert self.termaite_dir.is_dir()
-        assert (self.termaite_dir / "PLANNER.md").exists()
-        assert result is True
+import tempfile
+import os
+import json
+from pathlib import Path
+from unittest.mock import Mock, patch
+from termaite.core.project_init import ProjectDiscovery, ContextGenerator, ProjectInitializer, ProjectInfo
+from termaite.config.manager import ConfigManager
 
 
-class TestCustomizedPromptLoading:
-    """Test the customized prompt loading functionality."""
+class TestProjectDiscovery:
+    """Test project discovery functionality."""
+    
+    @pytest.fixture
+    def temp_project(self):
+        """Create temporary project structure for testing."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create Python project structure
+            (Path(temp_dir) / "requirements.txt").write_text("flask==2.0.1\npytest==6.2.4")
+            (Path(temp_dir) / "app.py").write_text("from flask import Flask\napp = Flask(__name__)")
+            (Path(temp_dir) / "README.md").write_text("# Test Project")
+            
+            # Create source directory
+            src_dir = Path(temp_dir) / "src"
+            src_dir.mkdir()
+            (src_dir / "__init__.py").write_text("")
+            (src_dir / "main.py").write_text("def main(): pass")
+            
+            # Create tests directory
+            tests_dir = Path(temp_dir) / "tests"
+            tests_dir.mkdir()
+            (tests_dir / "test_main.py").write_text("def test_main(): pass")
+            
+            yield temp_dir
+    
+    def test_python_project_detection(self, temp_project):
+        """Test Python project detection."""
+        discovery = ProjectDiscovery(temp_project)
+        project_info = discovery.discover_project()
+        
+        assert project_info.project_type == "python"
+        assert project_info.language == "python"
+        assert project_info.framework == "flask"
+        assert project_info.build_system == "pip"
+        assert "requirements.txt" in project_info.key_files
+        assert "app.py" in project_info.key_files
+    
+    def test_javascript_project_detection(self):
+        """Test JavaScript project detection."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create JavaScript project
+            package_json = {
+                "name": "test-project",
+                "version": "1.0.0",
+                "dependencies": {
+                    "react": "^17.0.0",
+                    "express": "^4.17.0"
+                }
+            }
+            (Path(temp_dir) / "package.json").write_text(json.dumps(package_json))
+            (Path(temp_dir) / "index.js").write_text("const express = require('express')")
+            
+            discovery = ProjectDiscovery(temp_dir)
+            project_info = discovery.discover_project()
+            
+            assert project_info.project_type == "javascript"
+            assert project_info.language == "javascript"
+            assert project_info.build_system == "npm"
+            assert "package.json" in project_info.key_files
+    
+    def test_go_project_detection(self):
+        """Test Go project detection."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create Go project
+            (Path(temp_dir) / "go.mod").write_text("module test\n\ngo 1.19")
+            (Path(temp_dir) / "main.go").write_text("package main\n\nfunc main() {}")
+            
+            discovery = ProjectDiscovery(temp_dir)
+            project_info = discovery.discover_project()
+            
+            assert project_info.project_type == "go"
+            assert project_info.language == "go"
+            assert project_info.build_system == "go_modules"
+            assert "go.mod" in project_info.key_files
+    
+    def test_unknown_project_detection(self):
+        """Test unknown project type detection."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create directory with no recognizable project files
+            (Path(temp_dir) / "random.txt").write_text("some content")
+            
+            discovery = ProjectDiscovery(temp_dir)
+            project_info = discovery.discover_project()
+            
+            assert project_info.project_type == "unknown"
+            assert project_info.language == "unknown"
+    
+    def test_structure_scanning(self, temp_project):
+        """Test directory structure scanning."""
+        discovery = ProjectDiscovery(temp_project)
+        project_info = discovery.discover_project()
+        
+        structure_str = "\n".join(project_info.structure)
+        assert "📁 src/" in structure_str
+        assert "📁 tests/" in structure_str
+        assert "📄 app.py" in structure_str
+        assert "📄 requirements.txt" in structure_str
+    
+    def test_key_file_detection(self, temp_project):
+        """Test key file detection."""
+        discovery = ProjectDiscovery(temp_project)
+        project_info = discovery.discover_project()
+        
+        expected_files = ["requirements.txt", "app.py", "README.md"]
+        for expected_file in expected_files:
+            assert expected_file in project_info.key_files
+    
+    def test_framework_detection(self, temp_project):
+        """Test framework detection from file contents."""
+        discovery = ProjectDiscovery(temp_project)
+        project_info = discovery.discover_project()
+        
+        # Should detect Flask from app.py content
+        assert project_info.framework == "flask"
 
-    def setup_method(self):
-        """Set up test environment."""
-        self.test_dir = Path(tempfile.mkdtemp())
-        self.termaite_dir = self.test_dir / ".termaite"
-        self.termaite_dir.mkdir()
 
-    def teardown_method(self):
-        """Clean up test environment."""
-        if self.test_dir.exists():
-            shutil.rmtree(self.test_dir)
+class TestContextGenerator:
+    """Test context generation functionality."""
+    
+    @pytest.fixture
+    def mock_config_manager(self):
+        """Create mock config manager."""
+        config_manager = Mock(spec=ConfigManager)
+        return config_manager
+    
+    @pytest.fixture
+    def sample_project_info(self):
+        """Create sample project info for testing."""
+        return ProjectInfo(
+            project_type="python",
+            language="python",
+            framework="flask",
+            build_system="pip",
+            structure=["📁 src/", "📄 app.py", "📄 requirements.txt"],
+            key_files=["app.py", "requirements.txt", "README.md"],
+            description="Python project using Flask with pip build system"
+        )
+    
+    def test_template_generation(self, mock_config_manager, sample_project_info):
+        """Test template-based context generation."""
+        generator = ContextGenerator(mock_config_manager)
+        
+        with tempfile.TemporaryDirectory() as temp_dir:
+            context = generator._generate_template(sample_project_info, temp_dir)
+            
+            # Check that context contains expected sections
+            assert "# " in context  # Title section
+            assert "## Project Overview" in context
+            assert "## Description" in context
+            assert "## Project Structure" in context
+            assert "## Key Files" in context
+            assert "## Operational Guidance" in context
+            
+            # Check that project info is included
+            assert "Python" in context
+            assert "Flask" in context
+            assert "pip" in context
+            assert "app.py" in context
+            assert "requirements.txt" in context
+    
+    def test_project_guidance_generation(self, mock_config_manager, sample_project_info):
+        """Test project-specific guidance generation."""
+        generator = ContextGenerator(mock_config_manager)
+        
+        # Test Python Flask guidance
+        guidance = generator._get_project_guidance("python", "flask")
+        assert "blueprints" in guidance.lower()
+        assert "flask-sqlalchemy" in guidance.lower()
+        
+        # Test general Python guidance
+        guidance = generator._get_project_guidance("python", None)
+        assert "virtual environment" in guidance.lower()
+        assert "pep 8" in guidance.lower()
+        
+        # Test JavaScript guidance
+        guidance = generator._get_project_guidance("javascript", "react")
+        assert "functional components" in guidance.lower()
+        assert "hooks" in guidance.lower()
+    
+    def test_common_commands_generation(self, mock_config_manager):
+        """Test common commands generation."""
+        generator = ContextGenerator(mock_config_manager)
+        
+        # Test Python commands
+        commands = generator._get_common_commands("python", "pip")
+        assert "pip install" in commands
+        assert "pytest" in commands
+        
+        # Test JavaScript commands
+        commands = generator._get_common_commands("javascript", "npm")
+        assert "npm install" in commands
+        assert "npm start" in commands
+        
+        # Test Go commands
+        commands = generator._get_common_commands("go", "go_modules")
+        assert "go mod tidy" in commands
+        assert "go run" in commands
+    
+    def test_workflow_guidance(self, mock_config_manager):
+        """Test workflow guidance generation."""
+        generator = ContextGenerator(mock_config_manager)
+        
+        python_workflow = generator._get_workflow_guidance("python", None)
+        assert "virtual environment" in python_workflow.lower()
+        assert "dependencies" in python_workflow.lower()
+        
+        javascript_workflow = generator._get_workflow_guidance("javascript", None)
+        assert "dependencies" in javascript_workflow.lower()
+        assert "development server" in javascript_workflow.lower()
 
-    def test_load_customized_prompt_existing_file(self):
-        """Test loading a customized prompt from existing file."""
-        # Create test config and payload builder
-        config = {"plan_prompt": "default prompt"}
-        payload_file = self.test_dir / "payload.json"
-        payload_file.write_text('{"test": "payload"}')
 
-        builder = PayloadBuilder(config, payload_file, str(self.test_dir))
+class TestProjectInitializer:
+    """Test project initialization coordination."""
+    
+    @pytest.fixture
+    def mock_config_manager(self):
+        """Create mock config manager."""
+        config_manager = Mock(spec=ConfigManager)
+        return config_manager
+    
+    def test_successful_initialization(self, mock_config_manager):
+        """Test successful project initialization."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create a simple Python project
+            (Path(temp_dir) / "requirements.txt").write_text("flask==2.0.1")
+            (Path(temp_dir) / "app.py").write_text("from flask import Flask")
+            
+            initializer = ProjectInitializer(mock_config_manager)
+            success = initializer.initialize_project(temp_dir)
+            
+            assert success
+            
+            # Check that .TERMAITE.md was created
+            context_file = Path(temp_dir) / ".TERMAITE.md"
+            assert context_file.exists()
+            
+            # Check content
+            content = context_file.read_text()
+            assert "Project Overview" in content
+            assert "Python" in content
+            assert "Flask" in content
+    
+    def test_context_loading(self, mock_config_manager):
+        """Test context loading from existing file."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create .TERMAITE.md file
+            context_content = "# Test Project\n\nThis is a test project."
+            context_file = Path(temp_dir) / ".TERMAITE.md"
+            context_file.write_text(context_content)
+            
+            initializer = ProjectInitializer(mock_config_manager)
+            loaded_context = initializer.load_project_context(temp_dir)
+            
+            assert loaded_context == context_content
+    
+    def test_context_for_llm(self, mock_config_manager):
+        """Test context formatting for LLM."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create .TERMAITE.md file
+            context_content = "# Test Project\n\nThis is a test project."
+            context_file = Path(temp_dir) / ".TERMAITE.md"
+            context_file.write_text(context_content)
+            
+            initializer = ProjectInitializer(mock_config_manager)
+            llm_context = initializer.get_project_context_for_llm(temp_dir)
+            
+            assert "# PROJECT CONTEXT" in llm_context
+            assert context_content in llm_context
+    
+    def test_missing_context_file(self, mock_config_manager):
+        """Test handling of missing context file."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            initializer = ProjectInitializer(mock_config_manager)
+            
+            # Should return None for missing file
+            loaded_context = initializer.load_project_context(temp_dir)
+            assert loaded_context is None
+            
+            # Should return empty string for LLM context
+            llm_context = initializer.get_project_context_for_llm(temp_dir)
+            assert llm_context == ""
+    
+    def test_initialization_error_handling(self, mock_config_manager):
+        """Test error handling during initialization."""
+        # Try to initialize in a non-existent directory
+        initializer = ProjectInitializer(mock_config_manager)
+        success = initializer.initialize_project("/non/existent/directory")
+        
+        assert not success
 
-        # Create a custom planner prompt file
-        planner_file = self.termaite_dir / "PLANNER.md"
-        custom_prompt = "This is a customized planner prompt for this project"
-        planner_file.write_text(custom_prompt)
 
-        # Test loading the customized prompt
-        result = builder._load_customized_prompt("plan", self.termaite_dir)
-        assert result == custom_prompt
-
-    def test_load_customized_prompt_nonexistent_file(self):
-        """Test loading a customized prompt when file doesn't exist."""
-        config = {"plan_prompt": "default prompt"}
-        payload_file = self.test_dir / "payload.json"
-        payload_file.write_text('{"test": "payload"}')
-
-        builder = PayloadBuilder(config, payload_file, str(self.test_dir))
-
-        # Test loading when file doesn't exist
-        result = builder._load_customized_prompt("plan", self.termaite_dir)
-        assert result is None
-
-    def test_load_customized_prompt_invalid_phase(self):
-        """Test loading a customized prompt with invalid phase."""
-        config = {"plan_prompt": "default prompt"}
-        payload_file = self.test_dir / "payload.json"
-        payload_file.write_text('{"test": "payload"}')
-
-        builder = PayloadBuilder(config, payload_file, str(self.test_dir))
-
-        # Test loading with invalid phase
-        result = builder._load_customized_prompt("invalid_phase", self.termaite_dir)
-        assert result is None
-
-    def test_get_system_prompt_for_phase_with_customized(self):
-        """Test that get_system_prompt_for_phase uses customized prompts when available."""
-        config = {"plan_prompt": "default plan prompt"}
-        payload_file = self.test_dir / "payload.json"
-        payload_file.write_text('{"test": "payload"}')
-
-        builder = PayloadBuilder(config, payload_file, str(self.test_dir))
-
-        # Create a custom planner prompt file
-        planner_file = self.termaite_dir / "PLANNER.md"
-        custom_prompt = "This is a customized planner prompt"
-        planner_file.write_text(custom_prompt)
-
-        # Test that the customized prompt is used
-        result = builder._get_system_prompt_for_phase("plan")
-        assert result == custom_prompt
-
-    def test_get_system_prompt_for_phase_fallback_to_default(self):
-        """Test that get_system_prompt_for_phase falls back to default when no custom prompt."""
-        config = {"plan_prompt": "default plan prompt"}
-        payload_file = self.test_dir / "payload.json"
-        payload_file.write_text('{"test": "payload"}')
-
-        builder = PayloadBuilder(config, payload_file, str(self.test_dir))
-
-        # No custom prompt file created
-        # Test that the default prompt is used
-        result = builder._get_system_prompt_for_phase("plan")
-        assert result == "default plan prompt"
-
-
-class TestCLIInitFlag:
-    """Test the --init CLI flag functionality."""
-
-    @patch("termaite.cli.create_application")
-    def test_cli_init_flag_calls_initialize_project_prompts(self, mock_create_app):
-        """Test that --init flag calls initialize_project_prompts."""
-        from termaite.cli import main
-
-        # Mock the application
-        mock_app = Mock()
-        mock_app.initialize_project_prompts.return_value = True
-        mock_create_app.return_value = mock_app
-
-        # Test the --init flag
-        with pytest.raises(SystemExit) as exc_info:
-            main(["--init"])
-
-        # Verify that initialize_project_prompts was called
-        mock_app.initialize_project_prompts.assert_called_once()
-        assert exc_info.value.code == 0
-
-    @patch("termaite.cli.create_application")
-    def test_cli_init_flag_handles_failure(self, mock_create_app):
-        """Test that --init flag handles initialization failure."""
-        from termaite.cli import main
-
-        # Mock the application to return failure
-        mock_app = Mock()
-        mock_app.initialize_project_prompts.return_value = False
-        mock_create_app.return_value = mock_app
-
-        # Test the --init flag with failure
-        with pytest.raises(SystemExit) as exc_info:
-            main(["--init"])
-
-        # Verify that initialize_project_prompts was called and failed
-        mock_app.initialize_project_prompts.assert_called_once()
-        assert exc_info.value.code == 1
+if __name__ == "__main__":
+    pytest.main([__file__])

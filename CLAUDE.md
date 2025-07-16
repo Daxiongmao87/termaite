@@ -4,227 +4,126 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**term.ai.te** is an LLM-powered shell assistant with a modular **multi-agent architecture** (Plan-Act-Evaluate). It executes natural language requests through AI agents that plan, execute, and evaluate shell commands safely.
+Termaite is a Python-based terminal agent that uses bash commands as tool calls. The agent operates through a clean TUI interface and manages task execution through a structured JSON-based communication protocol with LLMs.
 
-## Architecture Overview
+## Core Architecture
 
-### Multi-Agent System
-The core system implements a **three-agent architecture**:
+### JSON Communication Protocol
+The LLM must ONLY respond in JSON format using these schemas:
 
-1. **Plan Agent** (`termaite/core/task_handler.py:42-44`) - Analyzes user requests and creates execution plans
-2. **Action Agent** - Executes individual steps and generates shell commands  
-3. **Evaluation Agent** - Assesses results and determines next actions (continue/revise/complete/fail)
+**Goal Statement Creation** (required at task start):
+```json
+{
+    "message": "User-facing message about creating goal",
+    "operation": {
+        "create_goal": {
+            "statement": "Factual goal statement"
+        }
+    }
+}
+```
 
-### Key Components
-- **Application Core** (`termaite/core/application.py`) - Main application orchestration and interactive session management
-- **Task Handler** (`termaite/core/task_handler.py`) - Plan-Act-Evaluate loop execution
-- **Simple Handler** (`termaite/core/simple_handler.py`) - Direct LLM responses without multi-step planning
-- **Configuration Manager** (`termaite/config/manager.py`) - YAML config loading and command permission management
-- **Command Execution** (`termaite/commands/`) - Safe command execution with permission systems
-- **LLM Integration** (`termaite/llm/`) - API communication and response parsing
+**Task Status Determination**:
+```json
+{
+    "message": "Status assessment message",
+    "operation": {
+        "determine_task_status": "IN_PROGRESS" // or "COMPLETE"
+    }
+}
+```
+
+**Plan Management**:
+```json
+{
+    "message": "Plan modification explanation",
+    "operation": {
+        "manage_plan": [
+            {
+                "step": 1,
+                "action": "INSERT", // INSERT, EDIT, DELETE
+                "description": "Step description"
+            }
+        ]
+    }
+}
+```
+
+**Bash Command Execution**:
+```json
+{
+    "message": "Command explanation",
+    "operation": {
+        "invoke_bash_command": {
+            "command": "bash command to execute"
+        }
+    }
+}
+```
+
+### Task Execution Flow
+1. Create immutable goal statement (system enforced)
+2. Create/manage granular plan (each step = 1 bash command)
+3. Determine task completion status against goal
+4. Update plan based on command output
+5. Execute next planned bash command
+
+### System Constraints
+- **No TUI commands**: Agent cannot use interactive terminal applications
+- **Project root restriction**: Commands must stay within project directory
+- **Command whitelist**: New commands require user approval (y/n/a)
+- **Gremlin mode**: Bypasses safety confirmations when enabled
+
+## Built-in Commands
+
+- `/new` - Create new session
+- `/history` - Browse/resume/delete session history
+- `/config` - Edit configuration (LLM endpoint, context window, gremlin mode)
+- `/model` - View/select available models
+- `/exit` - Exit application
+
+## Memory Management
+
+### Context Window Protection
+- **Compaction trigger**: At 75% of context window
+- **Compaction method**: Summarize oldest 50% of session to single paragraph
+- **Preservation**: Always keep original user prompt
+- **Defensive reading**: If command output >50% context window, return error requiring targeted re-execution
+
+### Session History
+- **User view**: Complete word-for-word session preservation
+- **Agent view**: Compacted version fitting context constraints
 
 ## Development Commands
 
-### Development Setup
 ```bash
-# Install in development mode
+# Installation
 pip install -e .
 
-# Install development dependencies
-pip install -e .[dev]
-
-# Run from source
-python -m termaite "your request"
-```
-
-### Testing and Quality
-```bash
-# Run tests
-pytest tests/
-
-# Run tests with coverage
-pytest --cov=. --cov-report=term-missing
-
-# Code formatting
-black termaite/ tests/
-isort termaite/ tests/
-
-# Type checking
-mypy termaite/
-```
-
-### Package Building
-```bash
-# Build package
-python -m build
-
-# Install from local build
-pip install dist/termaite-*.whl
-```
-
-## Configuration System
-
-### Configuration Files Location
-- **Config Directory**: `~/.config/term.ai.te/`
-- **Main Config**: `config.yaml` - Operation mode, LLM endpoint, command permissions
-- **LLM Payload**: `payload.json` - API request template for LLM communication
-- **Response Parsing**: `response_path_template.txt` - jq path for extracting LLM responses
-
-### Project-Specific Customization
-The system supports **project-specific agent prompts** in `.termaite/` directory:
-- `PLANNER.md` - Enhanced Plan Agent prompt for project context
-- `ACTOR.md` - Enhanced Action Agent prompt  
-- `EVALUATOR.md` - Enhanced Evaluation Agent prompt
-
-Use `termaite --init` to auto-generate project-specific prompts by analyzing the current directory.
-
-## Code Architecture Patterns
-
-### Modular Design
-The codebase follows **strict modularity** after refactoring from a monolithic structure:
-
-```
-termaite/
-├── core/           # Application orchestration and task handling
-├── config/         # Configuration management and templates
-├── commands/       # Command execution, permissions, safety
-├── llm/           # LLM client, payload building, response parsing
-├── agents/        # Agent implementations (Plan/Action/Evaluate)
-└── utils/         # Logging, helpers, context management
-```
-
-### Safety and Security Architecture
-- **Three-tier permission system**: normal/gremlin/goblin operation modes
-- **Command whitelisting/blacklisting** with runtime permission management
-- **Timeout-based execution** with configurable limits
-- **LLM output validation** before command execution
-- **Audit logging** of all commands and decisions
-
-### Agent Communication Protocol
-Agents communicate through **structured text parsing**:
-- **Plan Agent**: Outputs `<checklist>` and `<instruction>` blocks
-- **Action Agent**: Outputs ````agent_command``` code blocks  
-- **Evaluation Agent**: Outputs `<decision>TAG: message</decision>` with continue/revise/complete/fail decisions
-
-## Development Guidelines
-
-### File Size Constraints
-- **CRITICAL**: No Python file should exceed **500 lines**
-- **MANDATORY**: Refactoring required at **800 lines**
-- The project was recently refactored from a 1300+ line monolith
-
-### Code Quality Standards
-- **Type hints required** for all functions and methods
-- **Single Responsibility Principle** - each module has focused purpose
-- **Comprehensive error handling** with proper logging
-- **Docstrings** for all public interfaces
-- **Security-first design** - validate all LLM outputs
-
-### Testing Strategy
-- **Unit tests** for all business logic components
-- **Integration tests** for agent workflows and LLM interactions
-- **Mock LLM responses** for predictable testing
-- **Command execution safety tests** to prevent dangerous operations
-
-### Configuration Management
-- **YAML-based configuration** in `~/.config/term.ai.te/`
-- **Template-based setup** with automatic file generation
-- **Runtime command permission updates** that persist to config
-- **Environment variable support** for sensitive settings
-
-## Common Operations
-
-### Running the Application
-```bash
-# Interactive mode (default)
+# Run application
 termaite
 
-# Single task execution
-termaite "list all Python files in the current directory"
+# Run tests
+python -m pytest
 
-# Agentic mode (Plan-Act-Evaluate)
-termaite -a "create a backup of my documents folder"
-
-# Simple mode (direct LLM response)
-termaite -s "what is the best programming language"
-
-# Debug mode
-termaite --debug "find all large files over 100MB"
+# Lint code
+python -m flake8 termaite/
+python -m black termaite/
 ```
 
-### Configuration Management
-```bash
-# Show current configuration
-termaite --config-summary
+## Security Features
 
-# Show config file locations
-termaite --config-location
+- **Filesystem protection**: Prevent commands outside project root
+- **Command validation**: Parse and validate all bash commands
+- **User confirmation**: Whitelist system for new commands
+- **Safe defaults**: No TUI or interactive command execution
 
-# Edit configuration file
-termaite --edit-config
+## Configuration Requirements
 
-# Initialize project-specific prompts
-termaite --init
-```
+Termaite requires valid configuration before operation:
+- LLM endpoint URL
+- Context window size
+- Gremlin mode setting
+- Model selection preferences
 
-### Interactive Mode Commands
-- `/exit`, `/quit` - Exit interactive mode
-- `/help` - Show available commands
-- `/history` - Show conversation history
-- `/stats` - Show session statistics  
-- `/clear` - Clear conversation history
-- `/init` - Initialize project-specific agent prompts
-- `-a <prompt>` - Use agentic mode for this prompt
-- `-s <prompt>` - Use simple mode for this prompt
-
-## Security Considerations
-
-### Operation Modes
-1. **normal**: Whitelisted commands require confirmation; others are blocked
-2. **gremlin**: Whitelisted commands auto-approved; others prompt for permission  
-3. **goblin**: All commands auto-approved (**USE WITH EXTREME CAUTION**)
-
-### Command Safety
-- **Blacklist validation** - Commands like `rm -rf /` are never allowed
-- **Whitelist system** with descriptions for approved commands
-- **Runtime permission prompts** for unknown commands in gremlin mode
-- **Command timeout enforcement** to prevent hanging operations
-- **Working directory isolation** - commands execute in specified directory
-
-### LLM Integration Security
-- **Response validation** before command execution
-- **Structured output parsing** to prevent injection attacks
-- **Error handling** for malformed LLM responses
-- **Context size management** to prevent prompt injection
-
-## Key Files to Understand
-
-For architecture understanding:
-- `termaite/core/application.py:108-784` - Main application class and interactive session management
-- `termaite/core/task_handler.py:71-100` - Plan-Act-Evaluate loop implementation
-- `termaite/config/manager.py:34-100` - Configuration loading and command permission management
-- `termaite/cli.py:15-103` - Command-line interface and argument parsing
-
-For extending functionality:
-- `termaite/llm/` - LLM integration and response parsing
-- `termaite/commands/` - Command execution and safety systems
-- `termaite/config/templates.py` - Default configuration templates
-
-## Development Notes
-
-### Recent Refactoring
-The project was recently refactored from a monolithic 1300+ line file into a modular architecture. All development should follow the new modular patterns.
-
-### Documentation Synchronization  
-When making architectural changes, update both:
-- `IMPLEMENTATION.md` - Technical implementation details
-- `.github/copilot-instructions.md` - AI assistant development guidelines
-
-### Project-Specific Features
-The `/init` command enables auto-customization of agent prompts by investigating the current project directory and generating context-aware system prompts stored in `.termaite/`.
-
-This allows the same termaite installation to work effectively across different types of projects (software, documents, research, etc.) by understanding project-specific patterns and conventions.
-
-## Memories
-
-- termaite is nondeterministic. SET TIMEOUTS TO BE LONG IF NECESSARY, 10+ MINUTES, ESPECIALLY FOR AGENTIC (-a) COMMANDS
+Configuration template should be self-explanatory with clear instructions for each setting.
