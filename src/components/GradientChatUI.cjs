@@ -163,11 +163,13 @@ class GradientChatUI {
 
     // Handle Ctrl+C to exit - set this up before focusing input
     this.screen.key(['C-c'], () => {
+      this.screen.leave();
       process.exit(0);
     });
 
     // Also handle escape and q
     this.screen.key(['escape', 'q'], () => {
+      this.screen.leave();
       process.exit(0);
     });
 
@@ -260,6 +262,15 @@ class GradientChatUI {
     
     // Use the log widget's add method which properly handles tags
     this.chatBox.add(formattedMessage);
+    this.screen.render();
+  }
+
+  /**
+   * Clear the chat display
+   */
+  clearChat() {
+    this.chatBox.setContent('');
+    this.rawMessages = [];
     this.screen.render();
   }
 

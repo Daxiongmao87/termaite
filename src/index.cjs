@@ -165,10 +165,12 @@ async function handleSlashCommand(text) {
   switch (command) {
     case 'clear':
       historyManager.clearHistory();
+      chatUI.clearChat();
       chatUI.addMessage('History cleared', 'system');
       break;
       
     case 'exit':
+      chatUI.getScreen().leave();
       process.exit(0);
       break;
       
@@ -259,12 +261,19 @@ async function handleSlashCommand(text) {
       chatUI.addMessage(`Opening config file: ${configPath}`, 'system');
       chatUI.getScreen().render();
       
+      // Hide the screen before launching editor
+      chatUI.getScreen().leave();
+      
       const editorProcess = spawn(editor, [configPath], {
         stdio: 'inherit',
         shell: true
       });
       
       editorProcess.on('close', (code) => {
+        // Restore the screen after editor closes
+        chatUI.getScreen().enter();
+        chatUI.getScreen().render();
+        
         if (code === 0) {
           chatUI.addMessage('Config file closed', 'system');
           // Reload the config
@@ -274,6 +283,9 @@ async function handleSlashCommand(text) {
         } else {
           chatUI.addMessage(`Editor exited with code ${code}`, 'system');
         }
+        
+        // Refocus the input box
+        chatUI.getInputBox().focus();
         chatUI.getScreen().render();
       });
       break;
