@@ -66,6 +66,12 @@ class GradientChatUI {
       height: '100%-6', // Leave space for progress bar and input with margins
       content: '',
       tags: true,
+      padding: {
+        left: 2,
+        right: 2,
+        top: 1,
+        bottom: 1
+      },
       style: {
         fg: 'white',
         bg: 'black'
@@ -173,21 +179,47 @@ class GradientChatUI {
    * Setup scroll handlers for the chat box
    */
   setupScrollHandlers() {
-    // PageUp/PageDown keyboard scrolling
-    this.screen.key(['pageup'], () => {
+    // Handle PageUp/PageDown on the INPUT BOX since it always has focus
+    // This ensures they work no matter what
+    this.inputBox.key(['pageup'], () => {
       const scrollAmount = Math.floor(this.chatBox.height * 0.8); // Scroll 80% of visible height
       this.chatBox.scroll(-scrollAmount);
       this.screen.render();
+      return false; // Prevent event from bubbling
     });
 
-    this.screen.key(['pagedown'], () => {
+    this.inputBox.key(['pagedown'], () => {
       const scrollAmount = Math.floor(this.chatBox.height * 0.8); // Scroll 80% of visible height
       this.chatBox.scroll(scrollAmount);
       this.screen.render();
+      return false; // Prevent event from bubbling
     });
 
-    // Mouse wheel scrolling is handled automatically by blessed when mouse: true is set
-    // No additional code needed for mouse wheel functionality
+    // For true single-line scrolling, we need to override blessed's default behavior
+    // First clear any existing wheel handlers
+    const wheelDownListeners = this.chatBox.listeners('wheeldown');
+    const wheelUpListeners = this.chatBox.listeners('wheelup');
+    
+    // Remove blessed's default handlers (they scroll by height/2)
+    wheelDownListeners.forEach(listener => {
+      this.chatBox.removeListener('wheeldown', listener);
+    });
+    wheelUpListeners.forEach(listener => {
+      this.chatBox.removeListener('wheelup', listener);
+    });
+    
+    // Add our own single-line scroll handlers
+    this.chatBox.on('wheeldown', () => {
+      this.chatBox.scroll(1); // Exactly 1 line down
+      this.screen.render();
+      return false; // Prevent default behavior
+    });
+
+    this.chatBox.on('wheelup', () => {
+      this.chatBox.scroll(-1); // Exactly 1 line up
+      this.screen.render();
+      return false; // Prevent default behavior
+    });
   }
 
   /**
@@ -212,18 +244,21 @@ class GradientChatUI {
     let formattedMessage = '';
     switch (sender) {
       case 'user':
-        formattedMessage = `{bold}You:{/bold} ${message}\n`;
+        formattedMessage = `{bold}You:{/bold} ${message}`;
         break;
       case 'agent':
-        formattedMessage = `{bold}Agent:{/bold} ${message}\n`;
+        formattedMessage = `{bold}Agent:{/bold} ${message}`;
         break;
       case 'system':
       default:
-        formattedMessage = `{italic}System:{/italic} ${message}\n`;
+        formattedMessage = `{italic}System:{/italic} ${message}`;
         break;
     }
     
-    this.chatBox.content += formattedMessage;
+    // Get current content and append new message
+    const currentContent = this.chatBox.getContent();
+    const newContent = currentContent ? currentContent + '\n' + formattedMessage : formattedMessage;
+    this.chatBox.setContent(newContent);
     this.chatBox.setScrollPerc(100); // Scroll to bottom
     this.screen.render();
   }
@@ -275,7 +310,8 @@ class GradientChatUI {
   displayWelcomeMessage() {
     const asciiArt = this.generateAsciiArt();
     const welcomeText = '{center}{bold}Welcome to{/bold}{/center}\n\n';
-    this.chatBox.content = welcomeText + asciiArt + '\n\n';
+    const helpText = '\n\n{center}Type {bold}/help{/bold} to see available commands{/center}\n';
+    this.chatBox.setContent(welcomeText + asciiArt + helpText);
     this.screen.render();
   }
 
