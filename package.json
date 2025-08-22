@@ -1,0 +1,33 @@
+{
+  "name": "@termaite/termaite",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "type": "commonjs",
+  "bin": {
+    "termaite": "src/index.cjs"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/index.cjs"
+  },
+  "keywords": [
+    "ai",
+    "cli",
+    "agent",
+    "wrapper"
+  ],
+  "author": "Patrick",
+  "license": "MIT",
+  "description": "",
+  "dependencies": {
+    "blessed": "^0.1.81",
+    "yargs": "^18.0.0"
+  }
+}
