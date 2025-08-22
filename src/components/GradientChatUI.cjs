@@ -152,13 +152,18 @@ class GradientChatUI {
     // Setup scrolling event handlers
     this.setupScrollHandlers();
 
-    // Focus our input box.
-    this.inputBox.focus();
-
-    // Handle Ctrl+C to exit.
-    this.screen.key(['escape', 'q', 'C-c'], () => {
-      return process.exit(0);
+    // Handle Ctrl+C to exit - set this up before focusing input
+    this.screen.key(['C-c'], () => {
+      process.exit(0);
     });
+
+    // Also handle escape and q
+    this.screen.key(['escape', 'q'], () => {
+      process.exit(0);
+    });
+
+    // Focus our input box
+    this.inputBox.focus();
 
     // Render the screen.
     this.screen.render();

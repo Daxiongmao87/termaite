@@ -301,12 +301,14 @@ chatUI.getInputBox().on('submit', async (text) => {
     if (text.startsWith('/')) {
       await handleSlashCommand(text);
       chatUI.getInputBox().clearValue();
+      chatUI.getInputBox().focus();
       chatUI.getScreen().render();
       return;
     }
     
     chatUI.addMessage(text, 'user');
     chatUI.getInputBox().clearValue();
+    chatUI.getInputBox().focus();
     chatUI.getScreen().render();
     
     // Add to history
@@ -346,9 +348,14 @@ chatUI.getInputBox().on('submit', async (text) => {
       } finally {
         // Stop the pipe animation
         pipeAnimation.stop();
+        // Refocus after agent response
+        chatUI.getInputBox().focus();
+        chatUI.getScreen().render();
       }
     } else {
       chatUI.addMessage('No agents available', 'system');
+      chatUI.getInputBox().focus();
+      chatUI.getScreen().render();
     }
   }
 });
