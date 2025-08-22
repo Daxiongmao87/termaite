@@ -62,7 +62,7 @@ class GradientChatUI {
       top: 0,
       left: 0,
       width: '100%-2',
-      height: '100%-5', // Leave space for progress bar and input
+      height: '100%-6', // Leave space for progress bar and input with margins
       content: '',
       tags: true,
       style: {
@@ -78,29 +78,29 @@ class GradientChatUI {
       }
     });
 
-    // Create a progress bar for animations inside the main container
-    this.progressBar = blessed.box({
+    // Create a 1x1 pipe animation box inside the main container
+    this.pipeAnimationBox = blessed.box({
       parent: this.mainContainer,
-      bottom: 4,
-      left: 0,
-      width: '100%-2', // Account for parent borders
+      bottom: 5, // Positioned above the input box
+      left: 'center', // Center it horizontally
+      width: 3, // Small width for single character plus padding
       height: 1,
       content: ' ',
       tags: true,
+      align: 'center',
       style: {
-        fg: 'white',
+        fg: '#00FFFF', // Cyan color for the pipe animation
         bg: 'black'
       }
     });
 
-    // Create the input box inside the main container
-    this.inputBox = blessed.textbox({
+    // Create a container for the prompt and input
+    this.inputContainer = blessed.box({
       parent: this.mainContainer,
-      bottom: 0,
-      left: 0,
-      width: '100%-2', // Account for parent borders
+      bottom: 1, // Add 1 line margin from bottom
+      left: 1,   // Add 1 char margin from left
+      width: '100%-4', // Account for parent borders and margins
       height: 3,
-      tags: true,
       border: {
         type: 'line' // Single line border for input
       },
@@ -110,6 +110,37 @@ class GradientChatUI {
         border: {
           fg: '#808080' // Gray border for input
         }
+      }
+    });
+
+    // Create the prompt character
+    this.promptChar = blessed.text({
+      parent: this.inputContainer,
+      content: ' > ',
+      top: 0,
+      left: 0,
+      height: 1,
+      width: 3,
+      style: {
+        fg: 'green',
+        bg: 'black'
+      }
+    });
+
+    // Create the input box next to the prompt
+    this.inputBox = blessed.textbox({
+      parent: this.inputContainer,
+      top: 0,
+      left: 3, // Start after the prompt with space
+      width: '100%-3', // Account for the prompt width plus space
+      height: 1,
+      tags: true,
+      inputOnFocus: true, // Enable input when focused
+      keys: true,         // Enable keyboard input
+      mouse: true,        // Enable mouse support
+      style: {
+        fg: 'white',
+        bg: 'black'
       }
     });
 
@@ -191,19 +222,19 @@ class GradientChatUI {
   }
 
   /**
-   * Set the progress bar content
-   * @param {string} content - The content to display in the progress bar
+   * Set the pipe animation character
+   * @param {string} content - The pipe character to display
    */
   setProgressBar(content) {
-    this.progressBar.content = content;
+    this.pipeAnimationBox.content = content;
     this.screen.render();
   }
 
   /**
-   * Clear the progress bar
+   * Clear the pipe animation
    */
   clearProgressBar() {
-    this.progressBar.content = ' ';
+    this.pipeAnimationBox.content = ' ';
     this.screen.render();
   }
 
