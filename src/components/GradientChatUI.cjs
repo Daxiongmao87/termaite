@@ -5,7 +5,8 @@ class GradientChatUI {
     // Create a screen object.
     this.screen = blessed.screen({
       smartCSR: true,
-      title: 'TERMAITE'
+      title: 'TERMAITE',
+      mouse: true  // Enable mouse support for scrolling
     });
 
     // Define gradient colors (simplified for terminal)
@@ -72,6 +73,7 @@ class GradientChatUI {
       // Enable scrolling
       scrollable: true,
       alwaysScroll: true,
+      mouse: true,  // Enable mouse wheel support
       scrollbar: {
         ch: ' ',
         inverse: true
@@ -99,7 +101,7 @@ class GradientChatUI {
       parent: this.mainContainer,
       bottom: 1, // Add 1 line margin from bottom
       left: 1,   // Add 1 char margin from left
-      width: '100%-4', // Account for parent borders and margins
+      width: '100%-4', // Account for borders (2) and margins (2)
       height: 3,
       border: {
         type: 'line' // Single line border for input
@@ -132,7 +134,7 @@ class GradientChatUI {
       parent: this.inputContainer,
       top: 0,
       left: 3, // Start after the prompt with space
-      width: '100%-3', // Account for the prompt width plus space
+      right: 0, // Extend to the right edge of container's content area
       height: 1,
       tags: true,
       inputOnFocus: true, // Enable input when focused
@@ -147,6 +149,9 @@ class GradientChatUI {
     // Append main container to the screen
     this.screen.append(this.mainContainer);
 
+    // Setup scrolling event handlers
+    this.setupScrollHandlers();
+
     // Focus our input box.
     this.inputBox.focus();
 
@@ -157,6 +162,27 @@ class GradientChatUI {
 
     // Render the screen.
     this.screen.render();
+  }
+
+  /**
+   * Setup scroll handlers for the chat box
+   */
+  setupScrollHandlers() {
+    // PageUp/PageDown keyboard scrolling
+    this.screen.key(['pageup'], () => {
+      const scrollAmount = Math.floor(this.chatBox.height * 0.8); // Scroll 80% of visible height
+      this.chatBox.scroll(-scrollAmount);
+      this.screen.render();
+    });
+
+    this.screen.key(['pagedown'], () => {
+      const scrollAmount = Math.floor(this.chatBox.height * 0.8); // Scroll 80% of visible height
+      this.chatBox.scroll(scrollAmount);
+      this.screen.render();
+    });
+
+    // Mouse wheel scrolling is handled automatically by blessed when mouse: true is set
+    // No additional code needed for mouse wheel functionality
   }
 
   /**
