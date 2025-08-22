@@ -9,6 +9,9 @@ class GradientChatUI {
       mouse: true  // Enable mouse support for scrolling
     });
 
+    // Track raw messages with tags for proper rendering
+    this.rawMessages = [];
+
     // Define gradient colors (simplified for terminal)
     // Using a range of blue to cyan colors
     this.gradientColors = [
@@ -58,7 +61,7 @@ class GradientChatUI {
 
     // Create the chat box inside the main container
     // Note: Width is -2 to account for left and right borders of parent
-    this.chatBox = blessed.box({
+    this.chatBox = blessed.log({
       parent: this.mainContainer,
       top: 0,
       left: 0,
@@ -251,15 +254,12 @@ class GradientChatUI {
         break;
       case 'system':
       default:
-        formattedMessage = `{italic}System:{/italic} ${message}`;
+        formattedMessage = `{gray-fg}System:{/gray-fg} ${message}`;
         break;
     }
     
-    // Get current content and append new message
-    const currentContent = this.chatBox.getContent();
-    const newContent = currentContent ? currentContent + '\n' + formattedMessage : formattedMessage;
-    this.chatBox.setContent(newContent);
-    this.chatBox.setScrollPerc(100); // Scroll to bottom
+    // Use the log widget's add method which properly handles tags
+    this.chatBox.add(formattedMessage);
     this.screen.render();
   }
 
@@ -311,7 +311,10 @@ class GradientChatUI {
     const asciiArt = this.generateAsciiArt();
     const welcomeText = '{center}{bold}Welcome to{/bold}{/center}\n\n';
     const helpText = '\n\n{center}Type {bold}/help{/bold} to see available commands{/center}\n';
-    this.chatBox.setContent(welcomeText + asciiArt + helpText);
+    
+    // Set initial content for the log widget
+    const welcomeContent = welcomeText + asciiArt + helpText;
+    this.chatBox.setContent(welcomeContent);
     this.screen.render();
   }
 
