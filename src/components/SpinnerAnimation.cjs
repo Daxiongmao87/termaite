@@ -41,7 +41,7 @@ class SpinnerAnimation {
     this.currentFrame = 0;
     this.currentColor = this.getRandomColor();
     
-    // Start the animation loop at 30fps (33.33ms)
+    // Start the animation loop at 15fps (66.67ms)
     this.animate();
   }
   
@@ -53,7 +53,7 @@ class SpinnerAnimation {
     
     // Get current spinner frame with color
     const frame = this.spinnerFrames[this.currentFrame];
-    const display = `  {${this.currentColor}-fg}${frame}{/${this.currentColor}-fg}`;
+    const display = `{${this.currentColor}-fg}${frame}{/${this.currentColor}-fg}`;
     
     // Update spinner in chat log
     this.chatUI.setProgressBar(display);
@@ -66,8 +66,8 @@ class SpinnerAnimation {
       this.currentColor = this.getRandomColor();
     }
     
-    // Schedule next frame at 30fps (33.33ms)
-    this.animationInterval = setTimeout(() => this.animate(), 33);
+    // Schedule next frame at 15fps (66.67ms)
+    this.animationInterval = setTimeout(() => this.animate(), 67);
   }
   
   /**
