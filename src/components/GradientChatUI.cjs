@@ -2,7 +2,10 @@ const blessed = require('blessed');
 const CustomInput = require('./CustomInput.cjs');
 
 class GradientChatUI {
-  constructor() {
+  constructor(historyManager) {
+    // Store history manager reference
+    this.historyManager = historyManager || null;
+    
     // Create a screen object.
     this.screen = blessed.screen({
       smartCSR: true,
@@ -132,6 +135,7 @@ class GradientChatUI {
     this.inputBox = new CustomInput({
       parent: this.inputContainer,
       screen: this.screen,
+      historyManager: this.historyManager,
       top: 0,
       left: 3, // Start after the prompt with space
       right: 0, // Extend to the right edge of container's content area

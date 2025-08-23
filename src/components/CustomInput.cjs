@@ -8,6 +8,12 @@ class CustomInput {
     this.screen = options.screen;
     this.parent = options.parent;
     
+    // History management
+    this.historyManager = options.historyManager || null;
+    this.userMessages = [];
+    this.historyIndex = -1;
+    this.originalInput = '';
+    
     // Create a box instead of textbox
     this.box = blessed.box({
       parent: options.parent,
@@ -30,6 +36,11 @@ class CustomInput {
     this.cursorPos = 0;
     this.scrollOffset = 0;
     this.focused = false;
+    
+    // Load user messages from history if available
+    if (this.historyManager) {
+      this.loadUserMessages();
+    }
     
     // Setup event handlers
     this.setupEventHandlers();
@@ -86,10 +97,18 @@ class CustomInput {
         }
       } else if (key.name === 'enter') {
         this.box.emit('submit', this.value);
+        this.resetHistoryNavigation();
         handled = true;
       } else if (key.name === 'escape') {
         this.value = '';
         this.cursorPos = 0;
+        this.resetHistoryNavigation();
+        handled = true;
+      } else if (key.name === 'up') {
+        this.navigateUp();
+        handled = true;
+      } else if (key.name === 'down') {
+        this.navigateDown();
         handled = true;
       } else if (ch && !key.ctrl && !key.meta) {
         // Regular character input
@@ -236,6 +255,82 @@ class CustomInput {
   
   key(keys, handler) {
     this.box.key(keys, handler);
+  }
+  
+  /**
+   * Load user messages from history
+   */
+  loadUserMessages() {
+    if (!this.historyManager) return;
+    
+    try {
+      const history = this.historyManager.readHistory();
+      // Filter for user messages only and extract text
+      this.userMessages = history
+        .filter(entry => entry.sender === 'user')
+        .map(entry => entry.text);
+    } catch (error) {
+      // Silently fail if history can't be loaded
+      this.userMessages = [];
+    }
+  }
+  
+  /**
+   * Navigate up in history (older messages)
+   */
+  navigateUp() {
+    // Reload user messages to get latest
+    this.loadUserMessages();
+    
+    if (this.userMessages.length === 0) return;
+    
+    if (this.historyIndex === -1) {
+      // Starting navigation, save current input
+      this.originalInput = this.value;
+      this.historyIndex = 0;
+    } else if (this.historyIndex < this.userMessages.length - 1) {
+      // Move to older message
+      this.historyIndex++;
+    } else {
+      // Already at oldest message
+      return;
+    }
+    
+    // Load the message from history (reverse order - newest first)
+    const messageIndex = this.userMessages.length - 1 - this.historyIndex;
+    this.value = this.userMessages[messageIndex];
+    this.cursorPos = this.value.length;
+    this.render();
+  }
+  
+  /**
+   * Navigate down in history (newer messages)
+   */
+  navigateDown() {
+    if (this.historyIndex === -1) return; // Not navigating
+    
+    this.historyIndex--;
+    
+    if (this.historyIndex === -1) {
+      // Restore original input
+      this.value = this.originalInput;
+      this.originalInput = '';
+    } else {
+      // Load the message from history
+      const messageIndex = this.userMessages.length - 1 - this.historyIndex;
+      this.value = this.userMessages[messageIndex];
+    }
+    
+    this.cursorPos = this.value.length;
+    this.render();
+  }
+  
+  /**
+   * Reset history navigation state
+   */
+  resetHistoryNavigation() {
+    this.historyIndex = -1;
+    this.originalInput = '';
   }
 }
 
