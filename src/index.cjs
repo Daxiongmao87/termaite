@@ -92,17 +92,17 @@ if (argv.prompt) {
     console.error('\nPlease add at least one agent to your settings.json file.');
     console.error('Example agent configuration:\n');
     console.error(JSON.stringify({
-      name: "claude-code",
-      command: "claude-code",
+      name: "claude",
+      command: "claude --print",
       contextWindowTokens: 200000,
       timeoutSeconds: 120
     }, null, 2));
-    console.error('\nCommon agent commands:');
-    console.error('  claude-code     - Claude Code CLI');
-    console.error('  gemini-cli      - Gemini CLI');
-    console.error('  qwen-code       - Qwen Code CLI');
-    console.error('  cursor-agent    - Cursor Agent CLI');
-    console.error('  llxprt          - LLxprt CLI');
+    console.error('\nCommon agent commands (non-interactive modes):');
+    console.error('  claude --print        - Claude Code CLI');
+    console.error('  gemini --prompt       - Gemini CLI (use -p or --prompt)');
+    console.error('  qwen --prompt         - Qwen Code CLI (use -p or --prompt)');
+    console.error('  cursor-agent --print  - Cursor Agent CLI');
+    console.error('  llxprt --prompt       - LLxprt CLI (use -p or --prompt)');
     process.exit(1);
   }
   
@@ -398,18 +398,18 @@ chatUI.getInputBox().on('submit', async (text) => {
       chatUI.addMessage('Use /config to open the settings file, then add an agent like:', 'system');
       chatUI.addMessage('', 'system');
       chatUI.addMessage(JSON.stringify({
-        name: "claude-code",
-        command: "claude-code",
+        name: "claude",
+        command: "claude --print",
         contextWindowTokens: 200000,
         timeoutSeconds: 120
       }, null, 2), 'system');
       chatUI.addMessage('', 'system');
-      chatUI.addMessage('Common agent commands:', 'system');
-      chatUI.addMessage('  claude-code     - Claude Code CLI', 'system');
-      chatUI.addMessage('  gemini-cli      - Gemini CLI', 'system');
-      chatUI.addMessage('  qwen-code       - Qwen Code CLI', 'system');
-      chatUI.addMessage('  cursor-agent    - Cursor Agent CLI', 'system');
-      chatUI.addMessage('  llxprt          - LLxprt CLI', 'system');
+      chatUI.addMessage('Common agent commands (non-interactive modes):', 'system');
+      chatUI.addMessage('  claude --print        - Claude Code CLI', 'system');
+      chatUI.addMessage('  gemini --prompt       - Gemini CLI (use -p or --prompt)', 'system');
+      chatUI.addMessage('  qwen --prompt         - Qwen Code CLI (use -p or --prompt)', 'system');
+      chatUI.addMessage('  cursor-agent --print  - Cursor Agent CLI', 'system');
+      chatUI.addMessage('  llxprt --prompt       - LLxprt CLI (use -p or --prompt)', 'system');
       chatUI.getInputBox().focus();
       chatUI.getScreen().render();
     }
