@@ -1,164 +1,135 @@
-# TERMAITE - Multi-CLI-Agent Wrapper
+# TERMAITE
 
-TERMAITE is a command-line interface (CLI) wrapper that manages and rotates between multiple third-party CLI AI agents. It provides a unified interface that allows users to leverage multiple smaller subscriptions or free tiers from different AI providers, making the use of AI agents more affordable and flexible.
+Multi-agent AI CLI wrapper with intelligent rotation, fallback, and conversation management. Seamlessly use multiple AI agents (Claude, Gemini, Qwen, Cursor, etc.) with automatic failover and smart rotation strategies.
 
 ## Features
 
-- **Agent Rotation**: Intelligently rotate between configured agents using round-robin, exhaustion, or random strategies
-- **Project-Specific History**: Maintains separate chat history for each project
-- **Automatic Compaction**: Manages context size by automatically compacting history when needed
-- **Beautiful Terminal UI**: Modern chat-like interface with gradient colors and ASCII art
-- **Non-Interactive Mode**: Execute single prompts from the command line
-- **Resilient Agent Management**: Handles agent failures gracefully with timeouts and cool-down periods
+- 🔄 **Multiple Rotation Strategies**: Exhaustion (priority-based), Round-robin, and Random
+- 🛡️ **Automatic Failover**: Seamlessly switches to backup agents on failure
+- 💾 **Project-based History**: Maintains separate conversation history per project
+- 🎨 **Beautiful Terminal UI**: Gradient-styled interface with smooth animations
+- ⏱️ **Flexible Timeouts**: Global and per-agent timeout configuration
+- 🔧 **Auto-configuration**: Creates working config on first run
+- 📝 **Context Management**: Smart history compaction when approaching token limits
 
 ## Installation
 
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd term.ai.te
+npm install -g termaite
+```
 
-# Install dependencies
-npm install
+## Quick Start
 
-# Make the CLI executable globally (optional)
-npm link
+```bash
+# Interactive mode (default)
+termaite
+
+# Non-interactive mode
+termaite --prompt "Your question here"
+
+# Continue from most recent conversation
+termaite -c
+
+# Use specific agent
+termaite --agent claude --prompt "Your question"
+
+# Override rotation strategy
+termaite --rotation round-robin
 ```
 
 ## Configuration
 
-Create or edit `~/.termaite/settings.json`:
+On first run, TERMAITE creates `~/.termaite/settings.json` with sensible defaults:
 
 ```json
 {
-  "rotationStrategy": "round-robin",
+  "rotationStrategy": "exhaustion",
+  "globalTimeoutSeconds": null,
   "agents": [
     {
       "name": "claude",
-      "command": "claude-code",
-      "contextWindowTokens": 100000,
-      "timeoutSeconds": 30
+      "command": "claude --print --dangerously-skip-permissions",
+      "contextWindowTokens": 200000,
+      "timeoutSeconds": 300
     },
     {
       "name": "gemini",
-      "command": "gemini-cli",
-      "contextWindowTokens": 32000,
-      "timeoutSeconds": 30
+      "command": "gemini --prompt --yolo",
+      "contextWindowTokens": 1000000,
+      "timeoutSeconds": 300
     }
+    // ... more agents
   ]
 }
 ```
 
-### Agent Configuration Fields
+### Rotation Strategies
 
-- `name`: Unique identifier for the agent
-- `command`: The bash command to invoke the agent
-- `contextWindowTokens`: Maximum context window size for the agent
-- `timeoutSeconds`: Timeout duration for agent responses
+- **exhaustion** (default): Always tries agents in priority order. Cost-effective as it uses cheaper/preferred agents first.
+- **round-robin**: Rotates through agents for load distribution
+- **random**: Randomly selects agents
 
-## Usage
+### Timeout Configuration
 
-### Interactive Mode
+- **Per-agent**: Set `timeoutSeconds` on each agent (default: 300)
+- **Global override**: Set `globalTimeoutSeconds` to override all agents
+- **No timeout**: Set to `0` or negative value
 
+## Slash Commands
+
+- `/help` - Show available commands
+- `/clear` - Clear chat history
+- `/config` - Open settings in your editor
+- `/init` - Analyze and document current project
+- `/compact` - Manually compact chat history
+- `/switch <agent>` - Switch to specific agent
+- `/exit` - Exit application
+
+## Project History
+
+TERMAITE maintains separate conversation history for each project directory:
+- Histories stored in `~/.termaite/projects/<project-path>/history.jsonl`
+- Use `-c` flag to continue most recent conversation
+- Automatic compaction at 75% of smallest agent's context window
+
+## Supported Agents
+
+Pre-configured commands for popular agents:
+- **Claude**: `claude --print --dangerously-skip-permissions`
+- **Gemini**: `gemini --prompt --yolo`
+- **Qwen**: `qwen --prompt --yolo`
+- **Cursor**: `cursor-agent --print --force --output-format text`
+- **LLxprt**: `llxprt --yolo --prompt`
+
+Add your own agents or local models in `settings.json`.
+
+## Advanced Usage
+
+### Non-interactive Mode
 ```bash
-# Start the interactive chat interface
-termaite
+# Pipe input
+echo "Explain this code" | termaite --prompt "Review the input"
 
-# Continue from the most recent project
-termaite --continue
-
-# Start with a specific agent
-termaite --agent claude
-
-# Use a specific rotation strategy
-termaite --rotation random
+# Use in scripts
+result=$(termaite --prompt "Generate a UUID")
 ```
 
-### Non-Interactive Mode
-
+### Agent-specific Override
 ```bash
-# Execute a single prompt
-termaite --prompt "Your question here"
-
-# Combine with other flags
-termaite --agent gemini --prompt "Your question here"
+# Force specific agent for one request
+termaite --agent gemini --prompt "Complex calculation"
 ```
 
-### Command-Line Options
-
-- `-c, --continue`: Load chat history from the most recently used project
-- `-a, --agent <name>`: Override default rotation for the first turn
-- `-r, --rotation <strategy>`: Override rotation strategy (round-robin, exhaustion, random)
-- `-p, --prompt <text>`: Execute single prompt in non-interactive mode
-
-### Slash Commands
-
-While in interactive mode, you can use these commands:
-
-- `/help`: Show available commands
-- `/clear`: Delete the chat history for the current project
-- `/compact`: Manually trigger history summarization
-- `/init`: Investigate and summarize the current project
-- `/switch <agent>`: Temporarily switch to a specific agent
-- `/config`: Open the settings file in your default editor
-- `/exit`: Exit the application
-
-## Project Structure
-
-```
-term.ai.te/
-├── src/
-│   ├── index.cjs           # Main application entry point
-│   ├── components/         # UI components
-│   │   ├── GradientChatUI.cjs
-│   │   └── PipeAnimation.cjs
-│   ├── managers/           # Core management modules
-│   │   ├── AgentManager.cjs
-│   │   ├── ConfigManager.cjs
-│   │   ├── HistoryCompactor.cjs
-│   │   └── HistoryManager.cjs
-│   ├── services/           # Service layer
-│   │   └── AgentWrapper.cjs
-│   └── utils/              # Utility functions
-│       └── tokenEstimator.cjs
-├── package.json
-└── test-agent.cjs          # Test agent for development
-
-```
-
-## History Management
-
-Chat histories are stored in `~/.termaite/projects/` with a unique slug for each project directory. The history is maintained in JSONL format and automatically compacted when it reaches 75% of the smallest configured agent's context window.
-
-## Agent Rotation Strategies
-
-- **round-robin**: Cycles through agents sequentially
-- **exhaustion**: Uses the same agent until it fails, then switches
-- **random**: Randomly selects an agent for each interaction
-
-## Troubleshooting
-
-### Agent Timeout Issues
-If an agent frequently times out, increase its `timeoutSeconds` value in the configuration.
-
-### History Compaction
-If automatic compaction is triggered too frequently, consider using agents with larger context windows or manually compact with `/compact`.
-
-### Agent Failures
-Failed agents enter a cool-down period. The duration increases exponentially with consecutive failures, up to 30 minutes.
-
-## Development
-
+### Custom Rotation for Session
 ```bash
-# Run tests
-npm test
-
-# Start development mode
-npm start
-
-# Test with the included test agent
-node test-agent.cjs
+# Use round-robin for this session only
+termaite --rotation round-robin
 ```
+
+## Requirements
+
+- Node.js >= 18.0.0
+- At least one AI CLI agent installed (claude, gemini, qwen, etc.)
 
 ## License
 
@@ -166,4 +137,21 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Please read the SPECIFICATION.md and DEVELOPMENT.md files for detailed information about the project architecture and development guidelines.
+Contributions welcome! Please submit PRs to the GitHub repository.
+
+## Troubleshooting
+
+### No agents available
+- Check that at least one agent CLI is installed
+- Verify agent commands in `~/.termaite/settings.json`
+- Test agent commands directly in terminal
+
+### Agent timeouts
+- Increase `timeoutSeconds` for slow agents
+- Set `globalTimeoutSeconds` for consistent timeouts
+- Use `0` for no timeout on long-running tasks
+
+### UI Issues
+- Ensure terminal supports Unicode and colors
+- Try different terminal emulators if display is corrupted
+- Check terminal size is at least 80x24
