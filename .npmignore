@@ -1,0 +1,29 @@
+# Development files
+test-agent.cjs
+research/
+.git/
+.gitignore
+
+# Config files
+.termaite/
+CLAUDE.md
+idea.md
+TODO.md
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+*.test.js
+*.spec.js
+__tests__/
+coverage/

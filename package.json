@@ -1,12 +1,13 @@
 {
-  "name": "@termaite/termaite",
-  "version": "0.0.1",
+  "name": "termaite",
+  "version": "0.1.0",
+  "description": "Multi-agent AI CLI wrapper with intelligent rotation, fallback, and conversation management",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=18.0.0"
   },
   "type": "commonjs",
   "bin": {
-    "termaite": "src/index.cjs"
+    "termaite": "./src/index.cjs"
   },
   "files": [
     "src/",
@@ -21,11 +22,23 @@
     "ai",
     "cli",
     "agent",
-    "wrapper"
+    "wrapper",
+    "claude",
+    "gemini",
+    "qwen",
+    "cursor",
+    "llm",
+    "multi-agent",
+    "rotation",
+    "failover"
   ],
   "author": "Patrick",
   "license": "MIT",
-  "description": "",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/termaite.git"
+  },
+  "homepage": "https://github.com/yourusername/termaite#readme",
   "dependencies": {
     "blessed": "^0.1.81",
     "yargs": "^18.0.0"
