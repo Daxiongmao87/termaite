@@ -20,3 +20,12 @@ LLXPRT.md
 QWEN.md
 hello_world.cjs
 idea.md
+
+# Project temporary test files
+test-*.cjs
+src/test-*.cjs
+
+# Common editor swap/backup files
+*.swp
+*~
+*.tmp
