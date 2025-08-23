@@ -46,6 +46,14 @@ npx termaite
 - Node.js >= 18.0.0
 - At least one AI CLI agent installed ([Claude](https://claude.ai/download), [Gemini](https://github.com/google/generative-ai-docs), [Qwen](https://github.com/QwenLM/Qwen), etc.)
 
+## ⚠️ Safety Disclaimer
+
+TERMAITE can invoke external CLI agents that you configure. Granting agents full permissions or bypassing permission prompts (for example, using flags like `--dangerously-skip-permissions`) may allow unintended file, network, or system changes.
+
+- Proceed cautiously and review every agent command before use
+- Prefer least-privilege settings and interactive confirmation prompts
+- Do not run as root/admin; test in non-production environments first
+
 ## 🎯 Quick Start
 
 ### 1. First Run - Automatic Setup
@@ -156,16 +164,6 @@ Options:
   ]
 }
 ```
-
-### Supported Agents
-
-| Agent | Command | Context Window |
-|-------|---------|----------------|
-| Claude | `claude --print --dangerously-skip-permissions` | 200k |
-| Gemini | `gemini --prompt --yolo` | 1M |
-| Qwen | `qwen --prompt --yolo` | 128k |
-| Cursor | `cursor-agent --print --force --output-format text` | 200k |
-| LLxprt | `llxprt --yolo --prompt` | 20k |
 
 ### Custom Agents & Local Models
 ```json
@@ -307,7 +305,7 @@ npm test
 
 ## 📜 License
 
-MIT © 2025 Patrick
+MIT © 2025 Daxiongmao87
 
 ## 🔗 Links
 
