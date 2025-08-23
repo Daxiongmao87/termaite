@@ -1,6 +1,22 @@
 const { spawn } = require('child_process');
 
 class AgentWrapper {
+  // Track the current running process for cancellation
+  static currentProcess = null;
+  
+  /**
+   * Cancel the currently running agent command
+   */
+  static cancelCurrentCommand() {
+    if (this.currentProcess) {
+      // Use SIGKILL for immediate termination
+      this.currentProcess.kill('SIGKILL');
+      this.currentProcess = null;
+      return true;
+    }
+    return false;
+  }
+  
   /**
    * Executes an agent command with timeout and I/O piping
    * @param {object} agent - The agent object containing command and timeout
@@ -29,6 +45,9 @@ class AgentWrapper {
       // Spawn the process
       const process = spawn(agent.command, { shell: true });
       
+      // Track this as the current process for cancellation
+      this.currentProcess = process;
+      
       let stdout = '';
       let stderr = '';
       
@@ -45,12 +64,14 @@ class AgentWrapper {
       // Handle process close
       process.on('close', (code) => {
         if (timeoutId) clearTimeout(timeoutId);
+        this.currentProcess = null;  // Clear the tracked process
         resolve({ stdout, stderr, exitCode: code });
       });
       
       // Handle process error
       process.on('error', (error) => {
         if (timeoutId) clearTimeout(timeoutId);
+        this.currentProcess = null;  // Clear the tracked process
         reject(error);
       });
       
@@ -58,6 +79,7 @@ class AgentWrapper {
       if (hasTimeout) {
         timeoutId = setTimeout(() => {
           process.kill();
+          this.currentProcess = null;  // Clear the tracked process
           reject(new Error(`Agent command timed out after ${timeoutSeconds} seconds`));
         }, timeoutSeconds * 1000);
       }

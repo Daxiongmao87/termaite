@@ -81,7 +81,7 @@ class GradientChatUI {
         left: 2,
         right: 2,
         top: 1,
-        bottom: 1
+        bottom: 2  // Increased to prevent spinner clipping
       },
       style: {
         fg: 'white',
@@ -286,6 +286,26 @@ class GradientChatUI {
   }
 
   /**
+   * Remove the last N messages from the chat
+   * @param {number} count - Number of messages to remove
+   */
+  removeLastMessages(count) {
+    // Remove from the messages array
+    for (let i = 0; i < count; i++) {
+      this.messagesBeforeSpinner.pop();
+      this.rawMessages.pop();
+    }
+    
+    // Redraw the chat box with remaining messages
+    this.chatBox.setContent('');
+    this.messagesBeforeSpinner.forEach(msg => {
+      this.chatBox.add(msg);
+    });
+    
+    this.screen.render();
+  }
+
+  /**
    * Get the input box element
    * @returns {object} The input box element
    */
@@ -326,6 +346,8 @@ class GradientChatUI {
     // Add the new spinner line
     this.chatBox.add(content);
     this.spinnerShowing = true;
+    // Scroll to bottom to ensure spinner is visible
+    this.chatBox.setScrollPerc(100);
     this.screen.render();
   }
 

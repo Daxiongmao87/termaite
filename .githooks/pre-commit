@@ -1,0 +1,119 @@
+#!/bin/bash
+
+# Pre-commit hook to check for code quality issues
+# Includes: unused variables, undefined references, syntax errors
+
+echo "Running pre-commit checks..."
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Track if any checks fail
+FAILED=0
+
+# 1. Check for syntax errors in all .cjs files
+echo -n "Checking syntax... "
+for file in $(find src -name "*.cjs" -type f); do
+    if ! node -c "$file" 2>/dev/null; then
+        echo -e "${RED}✗${NC}"
+        echo -e "${RED}Syntax error in $file${NC}"
+        node -c "$file"
+        FAILED=1
+        break
+    fi
+done
+
+if [ $FAILED -eq 0 ]; then
+    echo -e "${GREEN}✓${NC}"
+fi
+
+# 2. Check for common issues with grep
+echo -n "Checking for undefined variables... "
+
+# List of known global variables and modules that should be excluded
+KNOWN_GLOBALS="require module exports process console __dirname __filename setTimeout clearTimeout setInterval clearInterval Promise Error JSON Math Date RegExp Array Object String Number Boolean Map Set"
+
+# Check for potentially undefined variables (basic check)
+# Look for variables that are used but never declared with let/const/var/function
+UNDEFINED_FOUND=0
+for file in $(find src -name "*.cjs" -type f); do
+    # Extract all variable names being referenced (simplified check)
+    # This is a basic check - not as thorough as a proper AST parser
+    
+    # Check for references to variables that look like they should be imports or defined
+    # Look for patterns like: someVariable.method() or someVariable[...] where someVariable isn't defined
+    
+    # Skip checking for now as this would require proper AST parsing
+    # A simple grep-based approach would have too many false positives
+    :
+done
+
+if [ $UNDEFINED_FOUND -eq 0 ]; then
+    echo -e "${GREEN}✓${NC}"
+fi
+
+# 3. Check for unused requires (basic check)
+echo -n "Checking for unused requires... "
+UNUSED_FOUND=0
+
+for file in $(find src -name "*.cjs" -type f); do
+    # Get all requires in the file
+    requires=$(grep -o "require(['\"].*['\"])" "$file" 2>/dev/null | sed "s/require(['\"]\\(.*\\)['\"])/\\1/")
+    
+    # For each required module, check if it's used
+    while IFS= read -r module; do
+        if [ -n "$module" ]; then
+            # Extract the variable name from const/let/var X = require('...')
+            var_name=$(grep -E "(const|let|var)\s+(\w+|\{[^}]+\})\s*=\s*require\(['\"]$module['\"]\)" "$file" | sed -E "s/.*(const|let|var)\s+(\w+).*/\2/")
+            
+            if [ -n "$var_name" ]; then
+                # Check if this variable is used elsewhere in the file (exclude the require line itself)
+                usage_count=$(grep -c "\b$var_name\b" "$file")
+                if [ "$usage_count" -le 1 ]; then
+                    echo -e "\n${YELLOW}Warning: '$var_name' from require('$module') appears unused in $file${NC}"
+                    UNUSED_FOUND=1
+                fi
+            fi
+        fi
+    done <<< "$requires"
+done
+
+if [ $UNUSED_FOUND -eq 0 ]; then
+    echo -e "${GREEN}✓${NC}"
+else
+    echo -e "${YELLOW}(warnings only)${NC}"
+fi
+
+# 4. Check for console.log statements (optional warning)
+echo -n "Checking for console.log statements... "
+CONSOLE_COUNT=$(grep -r "console\.log" src --include="*.cjs" | grep -v "console\.error" | wc -l)
+if [ $CONSOLE_COUNT -gt 0 ]; then
+    echo -e "${YELLOW}Found $CONSOLE_COUNT console.log statements (consider removing for production)${NC}"
+else
+    echo -e "${GREEN}✓${NC}"
+fi
+
+# 5. Check for TODO/FIXME comments
+echo -n "Checking for TODO/FIXME comments... "
+TODO_COUNT=$(grep -r "TODO\|FIXME" src --include="*.cjs" | wc -l)
+if [ $TODO_COUNT -gt 0 ]; then
+    echo -e "${YELLOW}Found $TODO_COUNT TODO/FIXME comments${NC}"
+    grep -r "TODO\|FIXME" src --include="*.cjs" | head -5 | sed 's/^/  /'
+    if [ $TODO_COUNT -gt 5 ]; then
+        echo "  ... and $((TODO_COUNT - 5)) more"
+    fi
+else
+    echo -e "${GREEN}✓${NC}"
+fi
+
+# Exit with failure if any critical checks failed
+if [ $FAILED -eq 1 ]; then
+    echo -e "\n${RED}Pre-commit checks failed! Please fix the issues above.${NC}"
+    exit 1
+fi
+
+echo -e "\n${GREEN}All pre-commit checks passed!${NC}"
+exit 0

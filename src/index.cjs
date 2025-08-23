@@ -319,8 +319,8 @@ async function handleSlashCommand(text) {
       // Get the next agent for initialization
       const initAgent = agentManager.getNextAgent();
       if (initAgent) {
-        // Start the binary animation with init prompt
-        binaryAnimation.start('Initializing project analysis');
+        // Start the spinner animation
+        spinnerAnimation.start();
         
         try {
           const globalTimeout = configManager.getGlobalTimeout();
@@ -342,8 +342,8 @@ async function handleSlashCommand(text) {
         } catch (error) {
           chatUI.addMessage(`Error initializing project: ${error.message}`, 'system');
         } finally {
-          // Stop the binary animation
-          binaryAnimation.stop();
+          // Stop the spinner animation
+          spinnerAnimation.stop();
         }
       } else {
         chatUI.addMessage('No agents configured. Please add agents to ~/.termaite/settings.json', 'system');
@@ -408,6 +408,9 @@ async function handleSlashCommand(text) {
 let firstInteraction = true;
 let overrideAgent = null;
 
+// Track if an agent is currently running
+let agentIsRunning = false;
+
 if (argv.agent && argv.agent !== 'auto') {
   overrideAgent = configManager.getAgents().find(a => a.name === argv.agent);
   if (!overrideAgent) {
@@ -417,6 +420,12 @@ if (argv.agent && argv.agent !== 'auto') {
 
 // Handle input
 chatUI.getInputBox().on('submit', async (text) => {
+  // Block submission if agent is running
+  if (agentIsRunning) {
+    // Don't clear the input, just ignore the submission
+    return;
+  }
+  
   if (text) {
     // Handle slash commands
     if (text.startsWith('/')) {
@@ -451,11 +460,39 @@ chatUI.getInputBox().on('submit', async (text) => {
       // Show which agent is being used
       chatUI.addMessage(`Agent (${agent.name}):`, 'system');
       
+      // Track that we added 2 messages (user + agent) for cancellation
+      const messagesToRevert = 2;
+      
+      // Mark agent as running
+      agentIsRunning = true;
+      
       // Start the spinner animation
       spinnerAnimation.start();
       
       // Propagate instructions before executing agent command
       configManager.propagateInstructions();
+      
+      // Track if we cancelled to skip finally cleanup
+      let wasCancelled = false;
+      
+      // Add ESC key handler for cancellation
+      const escHandler = (ch, key) => {
+        if (key && key.name === 'escape') {
+          // Cancel the current agent command
+          if (AgentWrapper.cancelCurrentCommand()) {
+            // Immediate visual reversion
+            wasCancelled = true;
+            spinnerAnimation.stop();
+            chatUI.removeLastMessages(messagesToRevert);
+            agentIsRunning = false;
+            chatUI.getScreen().removeListener('keypress', escHandler);
+            
+            // Also remove from history
+            historyManager.removeLastEntry();
+          }
+        }
+      };
+      chatUI.getScreen().on('keypress', escHandler);
       
       // Execute the agent command with global timeout
       try {
@@ -465,31 +502,37 @@ chatUI.getInputBox().on('submit', async (text) => {
         
         // Check if agent failed (non-zero exit code)
         if (result.exitCode !== 0) {
-          chatUI.addMessage(`Agent ${agent.name} failed with exit code ${result.exitCode}`, 'system');
-          if (result.stderr) {
-            chatUI.addMessage(`Error: ${result.stderr}`, 'system');
-          }
-          agentManager.markAgentAsFailed(agent.name);
-          
-          // Try next agent
-          const nextAgent = agentManager.getNextAgent();
-          if (nextAgent && nextAgent.name !== agent.name) {
-            chatUI.addMessage(`Agent (${nextAgent.name}):`, 'system');
-            configManager.propagateInstructions();
-            const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
-            if (retryResult.exitCode === 0) {
-              chatUI.addMessage(retryResult.stdout, 'agent');
-              // Add agent response to history
-              historyManager.writeHistory({
-                sender: 'agent',
-                text: retryResult.stdout,
-                timestamp: new Date().toISOString()
-              });
-            } else {
-              chatUI.addMessage(`Agent ${nextAgent.name} also failed`, 'system');
-            }
+          // Exit code 137 means SIGKILL (128 + 9)
+          // Don't show anything for cancellation - already handled by ESC handler
+          if (result.exitCode === 137 || result.exitCode === null) {
+            // Cancelled - do nothing, ESC handler already cleaned up
           } else {
-            chatUI.addMessage('No alternative agents available', 'system');
+            chatUI.addMessage(`Agent ${agent.name} failed with exit code ${result.exitCode}`, 'system');
+            if (result.stderr) {
+              chatUI.addMessage(`Error: ${result.stderr}`, 'system');
+            }
+            agentManager.markAgentAsFailed(agent.name);
+          
+            // Try next agent
+            const nextAgent = agentManager.getNextAgent();
+            if (nextAgent && nextAgent.name !== agent.name) {
+              chatUI.addMessage(`Agent (${nextAgent.name}):`, 'system');
+              configManager.propagateInstructions();
+              const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
+              if (retryResult.exitCode === 0) {
+                chatUI.addMessage(retryResult.stdout, 'agent');
+                // Add agent response to history
+                historyManager.writeHistory({
+                  sender: 'agent',
+                  text: retryResult.stdout,
+                  timestamp: new Date().toISOString()
+                });
+              } else {
+                chatUI.addMessage(`Agent ${nextAgent.name} also failed`, 'system');
+              }
+            } else {
+              chatUI.addMessage('No alternative agents available', 'system');
+            }
           }
         } else {
           chatUI.addMessage(result.stdout, 'agent');
@@ -502,40 +545,52 @@ chatUI.getInputBox().on('submit', async (text) => {
           });
         }
       } catch (error) {
-        chatUI.addMessage(`Error executing agent: ${error.message}`, 'system');
-        agentManager.markAgentAsFailed(agent.name);
-        
-        // Try next agent
-        const nextAgent = agentManager.getNextAgent();
-        if (nextAgent && nextAgent.name !== agent.name) {
-          chatUI.addMessage(`Agent (${nextAgent.name}):`, 'system');
-          try {
-            const history = historyManager.readHistory();
-            configManager.propagateInstructions();
-            const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
-            if (retryResult.exitCode === 0) {
-              chatUI.addMessage(retryResult.stdout, 'agent');
-              // Add agent response to history
-              historyManager.writeHistory({
-                sender: 'agent',
-                text: retryResult.stdout,
-                timestamp: new Date().toISOString()
-              });
-            } else {
-              chatUI.addMessage(`Agent ${nextAgent.name} also failed`, 'system');
-            }
-          } catch (retryError) {
-            chatUI.addMessage(`Fallback agent error: ${retryError.message}`, 'system');
-          }
+        // Check if this was a cancellation (SIGKILL signal or killed message)
+        if (error.message && (error.message.includes('SIGKILL') || error.message.includes('killed'))) {
+          // Cancelled - do nothing, ESC handler already cleaned up
         } else {
-          chatUI.addMessage('No alternative agents available', 'system');
+          chatUI.addMessage(`Error executing agent: ${error.message}`, 'system');
+          agentManager.markAgentAsFailed(agent.name);
+        
+          // Try next agent
+          const nextAgent = agentManager.getNextAgent();
+          if (nextAgent && nextAgent.name !== agent.name) {
+            chatUI.addMessage(`Agent (${nextAgent.name}):`, 'system');
+            try {
+              const history = historyManager.readHistory();
+              configManager.propagateInstructions();
+              const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
+              if (retryResult.exitCode === 0) {
+                chatUI.addMessage(retryResult.stdout, 'agent');
+                // Add agent response to history
+                historyManager.writeHistory({
+                  sender: 'agent',
+                  text: retryResult.stdout,
+                  timestamp: new Date().toISOString()
+                });
+              } else {
+                chatUI.addMessage(`Agent ${nextAgent.name} also failed`, 'system');
+              }
+            } catch (retryError) {
+              chatUI.addMessage(`Fallback agent error: ${retryError.message}`, 'system');
+            }
+          } else {
+            chatUI.addMessage('No alternative agents available', 'system');
+          }
         }
       } finally {
-        // Stop the spinner animation
-        spinnerAnimation.stop();
-        // Refocus after agent response
-        chatUI.getInputBox().focus();
-        chatUI.getScreen().render();
+        // Only do cleanup if we didn't already cancel
+        if (!wasCancelled) {
+          // Mark agent as no longer running
+          agentIsRunning = false;
+          // Remove the ESC key handler
+          chatUI.getScreen().removeListener('keypress', escHandler);
+          // Stop the spinner animation
+          spinnerAnimation.stop();
+          // Refocus after agent response
+          chatUI.getInputBox().focus();
+          chatUI.getScreen().render();
+        }
       }
     } else {
       chatUI.addMessage('No agents configured in ~/.termaite/settings.json', 'system');

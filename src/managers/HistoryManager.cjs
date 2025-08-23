@@ -154,6 +154,23 @@ class HistoryManager {
       return [];
     }
   }
+
+  /**
+   * Remove the last entry from history (used for cancellation)
+   */
+  removeLastEntry() {
+    const history = this.readHistory();
+    if (history.length > 0) {
+      history.pop();
+      // Rewrite the entire history file without the last entry
+      if (fs.existsSync(this.historyPath)) {
+        fs.writeFileSync(this.historyPath, '');
+      }
+      history.forEach(entry => {
+        this.writeHistory(entry);
+      });
+    }
+  }
 }
 
 module.exports = HistoryManager;

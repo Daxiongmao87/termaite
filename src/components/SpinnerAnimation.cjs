@@ -53,7 +53,7 @@ class SpinnerAnimation {
     
     // Get current spinner frame with color and bold
     const frame = this.spinnerFrames[this.currentFrame];
-    const display = `{bold}{${this.currentColor}-fg}${frame}{/${this.currentColor}-fg}{/bold}`;
+    const display = `{bold}{${this.currentColor}-fg}${frame}{/${this.currentColor}-fg}{/bold} {gray-fg}Esc to cancel{/gray-fg}`;
     
     // Update spinner in chat log
     this.chatUI.setProgressBar(display);
