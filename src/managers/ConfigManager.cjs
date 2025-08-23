@@ -60,6 +60,14 @@ class ConfigManager {
   }
 
   /**
+   * Get the global timeout override
+   * @returns {number|null} The global timeout in seconds, or null if not set
+   */
+  getGlobalTimeout() {
+    return this.config.globalTimeoutSeconds !== undefined ? this.config.globalTimeoutSeconds : null;
+  }
+
+  /**
    * Get the list of agents
    * @returns {array} The list of agents
    */

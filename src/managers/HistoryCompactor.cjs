@@ -6,6 +6,7 @@ class HistoryCompactor {
   constructor(configManager, historyManager) {
     this.configManager = configManager;
     this.historyManager = historyManager;
+    this.globalTimeout = configManager.getGlobalTimeout();
   }
 
   /**
@@ -63,7 +64,7 @@ class HistoryCompactor {
     
     // Request a summary from the agent
     try {
-      const result = await AgentWrapper.executeAgentCommand(agent, `Please summarize the following chat history:\n\n${historyString}`, []);
+      const result = await AgentWrapper.executeAgentCommand(agent, `Please summarize the following chat history:\n\n${historyString}`, [], this.globalTimeout);
       
       // Create a new entry for the summary
       const summaryEntry = {

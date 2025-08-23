@@ -6,15 +6,23 @@ class AgentWrapper {
    * @param {object} agent - The agent object containing command and timeout
    * @param {string} input - The input to pipe to the command
    * @param {array} history - The chat history
+   * @param {number} globalTimeout - Global timeout override from settings
    * @returns {Promise<{stdout: string, stderr: string, exitCode: number}>}
    */
-  static async executeAgentCommand(agent, input, history) {
+  static async executeAgentCommand(agent, input, history, globalTimeout = null) {
     // Augment the prompt with a request for a summary
     const augmentedInput = this.augmentPrompt(input, history);
     
     return new Promise((resolve, reject) => {
-      // Default to 120 seconds, 0 or negative means no timeout
-      const timeoutSeconds = agent.timeoutSeconds !== undefined ? agent.timeoutSeconds : 120;
+      // Priority: globalTimeout > agent.timeoutSeconds > default (300)
+      let timeoutSeconds;
+      if (globalTimeout !== null && globalTimeout !== undefined) {
+        timeoutSeconds = globalTimeout;
+      } else if (agent.timeoutSeconds !== undefined) {
+        timeoutSeconds = agent.timeoutSeconds;
+      } else {
+        timeoutSeconds = 300; // Default to 300 seconds (5 minutes)
+      }
       const hasTimeout = timeoutSeconds > 0;
       let timeoutId;
       

@@ -69,8 +69,9 @@ if (argv.prompt) {
     // Show which agent is being used in stderr so it doesn't interfere with stdout
     console.error(`[Using agent: ${agent.name}]`);
     
-    // Execute the agent command
-    AgentWrapper.executeAgentCommand(agent, argv.prompt, historyManager.readHistory())
+    // Execute the agent command with global timeout
+    const globalTimeout = configManager.getGlobalTimeout();
+    AgentWrapper.executeAgentCommand(agent, argv.prompt, historyManager.readHistory(), globalTimeout)
       .then(result => {
         // Check if agent failed (non-zero exit code)
         if (result.exitCode !== 0) {
@@ -86,7 +87,7 @@ if (argv.prompt) {
           if (nextAgent && nextAgent.name !== agent.name) {
             console.error(`Retrying with agent: ${nextAgent.name}`);
             // Recursively try with next agent
-            return AgentWrapper.executeAgentCommand(nextAgent, argv.prompt, historyManager.readHistory());
+            return AgentWrapper.executeAgentCommand(nextAgent, argv.prompt, historyManager.readHistory(), globalTimeout);
           } else {
             console.error('No alternative agents available');
             process.exit(1);
@@ -116,7 +117,7 @@ if (argv.prompt) {
         if (nextAgent && nextAgent.name !== agent.name) {
           console.error(`Retrying with agent: ${nextAgent.name}`);
           // Try with next agent
-          AgentWrapper.executeAgentCommand(nextAgent, argv.prompt, historyManager.readHistory())
+          AgentWrapper.executeAgentCommand(nextAgent, argv.prompt, historyManager.readHistory(), globalTimeout)
             .then(result => {
               if (result.exitCode === 0) {
                 console.log(result.stdout);
@@ -153,7 +154,7 @@ if (argv.prompt) {
       name: "claude",
       command: "claude --print --dangerously-skip-permissions",
       contextWindowTokens: 200000,
-      timeoutSeconds: 120  // Optional: defaults to 120, use 0 for no timeout
+      timeoutSeconds: 120  // Optional: defaults to 300, use 0 for no timeout
     }, null, 2));
     console.error('\nCommon agent commands (non-interactive modes with permission bypass):');
     console.error('  claude --print --dangerously-skip-permissions');
@@ -314,10 +315,12 @@ async function handleSlashCommand(text) {
         pipeAnimation.start();
         
         try {
+          const globalTimeout = configManager.getGlobalTimeout();
           const result = await AgentWrapper.executeAgentCommand(
             initAgent, 
             'Please investigate the current project and write comprehensive yet high-level details of the project and general guidelines in working in it.', 
-            []
+            [],
+            globalTimeout
           );
           chatUI.addMessage(result.stdout, 'agent');
           
@@ -430,10 +433,11 @@ chatUI.getInputBox().on('submit', async (text) => {
       // Start the pipe animation
       pipeAnimation.start();
       
-      // Execute the agent command
+      // Execute the agent command with global timeout
       try {
         const history = historyManager.readHistory();
-        const result = await AgentWrapper.executeAgentCommand(agent, text, history);
+        const globalTimeout = configManager.getGlobalTimeout();
+        const result = await AgentWrapper.executeAgentCommand(agent, text, history, globalTimeout);
         
         // Check if agent failed (non-zero exit code)
         if (result.exitCode !== 0) {
@@ -447,7 +451,7 @@ chatUI.getInputBox().on('submit', async (text) => {
           const nextAgent = agentManager.getNextAgent();
           if (nextAgent && nextAgent.name !== agent.name) {
             chatUI.addMessage(`Retrying with agent: ${nextAgent.name}`, 'system');
-            const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history);
+            const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
             if (retryResult.exitCode === 0) {
               chatUI.addMessage(retryResult.stdout, 'agent');
               // Add agent response to history
@@ -482,7 +486,7 @@ chatUI.getInputBox().on('submit', async (text) => {
           chatUI.addMessage(`Retrying with agent: ${nextAgent.name}`, 'system');
           try {
             const history = historyManager.readHistory();
-            const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history);
+            const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
             if (retryResult.exitCode === 0) {
               chatUI.addMessage(retryResult.stdout, 'agent');
               // Add agent response to history
@@ -517,7 +521,7 @@ chatUI.getInputBox().on('submit', async (text) => {
         name: "claude",
         command: "claude --print --dangerously-skip-permissions",
         contextWindowTokens: 200000,
-        timeoutSeconds: 120  // Optional: defaults to 120, use 0 for no timeout
+        timeoutSeconds: 120  // Optional: defaults to 300, use 0 for no timeout
       }, null, 2), 'system');
       chatUI.addMessage('', 'system');
       chatUI.addMessage('Common agent commands (non-interactive modes with permission bypass):', 'system');
