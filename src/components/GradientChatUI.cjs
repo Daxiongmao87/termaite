@@ -13,8 +13,8 @@ class GradientChatUI {
     this.rawMessages = [];
     
     // Track spinner state
-    this.spinnerLineIndex = -1;
-    this.isSpinnerShowing = false;
+    this.spinnerShowing = false;
+    this.messagesBeforeSpinner = [];
 
     // Define gradient colors (simplified for terminal)
     // Using a range of blue to cyan colors
@@ -249,6 +249,14 @@ class GradientChatUI {
         break;
     }
     
+    // If spinner is showing, we need to remove it first
+    if (this.spinnerShowing) {
+      this.clearProgressBar();
+    }
+    
+    // Track the message
+    this.messagesBeforeSpinner.push(formattedMessage);
+    
     // Use the log widget's add method which properly handles tags
     this.chatBox.add(formattedMessage);
     this.screen.render();
@@ -260,6 +268,8 @@ class GradientChatUI {
   clearChat() {
     this.chatBox.setContent('');
     this.rawMessages = [];
+    this.messagesBeforeSpinner = [];
+    this.spinnerShowing = false;
     this.screen.render();
   }
 
@@ -292,23 +302,18 @@ class GradientChatUI {
    * @param {string} content - The spinner character to display
    */
   setProgressBar(content) {
-    // If spinner is already showing, remove the old line
-    if (this.isSpinnerShowing) {
-      // Get the current lines from the log
-      const lines = this.chatBox.getLines();
-      // Remove the last line (which should be the spinner)
-      if (lines.length > 0 && lines[lines.length - 1].includes('◜') || 
-          lines[lines.length - 1].includes('◝') || 
-          lines[lines.length - 1].includes('◞') || 
-          lines[lines.length - 1].includes('◟')) {
-        lines.pop();
-        this.chatBox.setContent(lines.join('\n'));
-      }
+    // If spinner is already showing, we need to redraw everything
+    if (this.spinnerShowing) {
+      // Restore messages without spinner
+      this.chatBox.setContent('');
+      this.messagesBeforeSpinner.forEach(msg => {
+        this.chatBox.add(msg);
+      });
     }
     
     // Add the new spinner line
     this.chatBox.add(content);
-    this.isSpinnerShowing = true;
+    this.spinnerShowing = true;
     this.screen.render();
   }
 
@@ -316,18 +321,13 @@ class GradientChatUI {
    * Clear the spinner animation
    */
   clearProgressBar() {
-    if (this.isSpinnerShowing) {
-      // Get the current lines from the log
-      const lines = this.chatBox.getLines();
-      // Remove the last line if it's the spinner
-      if (lines.length > 0 && (lines[lines.length - 1].includes('◜') || 
-          lines[lines.length - 1].includes('◝') || 
-          lines[lines.length - 1].includes('◞') || 
-          lines[lines.length - 1].includes('◟'))) {
-        lines.pop();
-        this.chatBox.setContent(lines.join('\n'));
-      }
-      this.isSpinnerShowing = false;
+    if (this.spinnerShowing) {
+      // Restore all messages without the spinner
+      this.chatBox.setContent('');
+      this.messagesBeforeSpinner.forEach(msg => {
+        this.chatBox.add(msg);
+      });
+      this.spinnerShowing = false;
     }
     this.screen.render();
   }
