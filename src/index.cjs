@@ -8,7 +8,7 @@ const HistoryManager = require('./managers/HistoryManager.cjs');
 const AgentManager = require('./managers/AgentManager.cjs');
 const AgentWrapper = require('./services/AgentWrapper.cjs');
 const HistoryCompactor = require('./managers/HistoryCompactor.cjs');
-const BinaryAnimation = require('./components/BinaryAnimation.cjs');
+const SpinnerAnimation = require('./components/SpinnerAnimation.cjs');
 const { spawn } = require('child_process');
 const os = require('os');
 
@@ -220,8 +220,8 @@ if (historyCompactor.isCompactionNeeded()) {
 // Create the chat UI
 const chatUI = new GradientChatUI();
 
-// Create the binary animation
-const binaryAnimation = new BinaryAnimation(chatUI);
+// Create the spinner animation
+const spinnerAnimation = new SpinnerAnimation(chatUI);
 
 // Display welcome message with ASCII art
 chatUI.displayWelcomeMessage();
@@ -428,10 +428,10 @@ chatUI.getInputBox().on('submit', async (text) => {
     }
     if (agent) {
       // Show which agent is being used
-      chatUI.addMessage(`[Using agent: ${agent.name}]`, 'system');
+      chatUI.addMessage(`Agent (${agent.name}):`, 'system');
       
-      // Start the binary animation with user's prompt
-      binaryAnimation.start(text);
+      // Start the spinner animation
+      spinnerAnimation.start();
       
       // Execute the agent command with global timeout
       try {
@@ -450,7 +450,7 @@ chatUI.getInputBox().on('submit', async (text) => {
           // Try next agent
           const nextAgent = agentManager.getNextAgent();
           if (nextAgent && nextAgent.name !== agent.name) {
-            chatUI.addMessage(`Retrying with agent: ${nextAgent.name}`, 'system');
+            chatUI.addMessage(`Agent (${nextAgent.name}):`, 'system');
             const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
             if (retryResult.exitCode === 0) {
               chatUI.addMessage(retryResult.stdout, 'agent');
@@ -483,7 +483,7 @@ chatUI.getInputBox().on('submit', async (text) => {
         // Try next agent
         const nextAgent = agentManager.getNextAgent();
         if (nextAgent && nextAgent.name !== agent.name) {
-          chatUI.addMessage(`Retrying with agent: ${nextAgent.name}`, 'system');
+          chatUI.addMessage(`Agent (${nextAgent.name}):`, 'system');
           try {
             const history = historyManager.readHistory();
             const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
@@ -505,8 +505,8 @@ chatUI.getInputBox().on('submit', async (text) => {
           chatUI.addMessage('No alternative agents available', 'system');
         }
       } finally {
-        // Stop the binary animation
-        binaryAnimation.stop();
+        // Stop the spinner animation
+        spinnerAnimation.stop();
         // Refocus after agent response
         chatUI.getInputBox().focus();
         chatUI.getScreen().render();
