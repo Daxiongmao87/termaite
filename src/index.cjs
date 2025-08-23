@@ -66,6 +66,9 @@ if (argv.prompt) {
   }
   
   if (agent) {
+    // Show which agent is being used in stderr so it doesn't interfere with stdout
+    console.error(`[Using agent: ${agent.name}]`);
+    
     // Execute the agent command
     AgentWrapper.executeAgentCommand(agent, argv.prompt, historyManager.readHistory())
       .then(result => {
@@ -366,6 +369,9 @@ chatUI.getInputBox().on('submit', async (text) => {
       agent = agentManager.getNextAgent();
     }
     if (agent) {
+      // Show which agent is being used
+      chatUI.addMessage(`[Using agent: ${agent.name}]`, 'system');
+      
       // Start the pipe animation
       pipeAnimation.start();
       
