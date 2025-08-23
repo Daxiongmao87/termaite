@@ -13,7 +13,9 @@ class AgentWrapper {
     const augmentedInput = this.augmentPrompt(input, history);
     
     return new Promise((resolve, reject) => {
-      const timeoutMs = (agent.timeoutSeconds || 30) * 1000;
+      // Default to 120 seconds, 0 or negative means no timeout
+      const timeoutSeconds = agent.timeoutSeconds !== undefined ? agent.timeoutSeconds : 120;
+      const hasTimeout = timeoutSeconds > 0;
       let timeoutId;
       
       // Spawn the process
@@ -34,21 +36,23 @@ class AgentWrapper {
       
       // Handle process close
       process.on('close', (code) => {
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
         resolve({ stdout, stderr, exitCode: code });
       });
       
       // Handle process error
       process.on('error', (error) => {
-        clearTimeout(timeoutId);
+        if (timeoutId) clearTimeout(timeoutId);
         reject(error);
       });
       
-      // Set timeout
-      timeoutId = setTimeout(() => {
-        process.kill();
-        reject(new Error(`Agent command timed out after ${agent.timeoutSeconds || 30} seconds`));
-      }, timeoutMs);
+      // Set timeout only if timeout is positive
+      if (hasTimeout) {
+        timeoutId = setTimeout(() => {
+          process.kill();
+          reject(new Error(`Agent command timed out after ${timeoutSeconds} seconds`));
+        }, timeoutSeconds * 1000);
+      }
       
       // Pipe input to the process with error handling
       if (augmentedInput) {

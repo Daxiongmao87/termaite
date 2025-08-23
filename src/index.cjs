@@ -153,7 +153,7 @@ if (argv.prompt) {
       name: "claude",
       command: "claude --print --dangerously-skip-permissions",
       contextWindowTokens: 200000,
-      timeoutSeconds: 120
+      timeoutSeconds: 120  // Optional: defaults to 120, use 0 for no timeout
     }, null, 2));
     console.error('\nCommon agent commands (non-interactive modes with permission bypass):');
     console.error('  claude --print --dangerously-skip-permissions');
@@ -517,7 +517,7 @@ chatUI.getInputBox().on('submit', async (text) => {
         name: "claude",
         command: "claude --print --dangerously-skip-permissions",
         contextWindowTokens: 200000,
-        timeoutSeconds: 120
+        timeoutSeconds: 120  // Optional: defaults to 120, use 0 for no timeout
       }, null, 2), 'system');
       chatUI.addMessage('', 'system');
       chatUI.addMessage('Common agent commands (non-interactive modes with permission bypass):', 'system');
