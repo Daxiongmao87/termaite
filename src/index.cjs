@@ -8,7 +8,7 @@ const HistoryManager = require('./managers/HistoryManager.cjs');
 const AgentManager = require('./managers/AgentManager.cjs');
 const AgentWrapper = require('./services/AgentWrapper.cjs');
 const HistoryCompactor = require('./managers/HistoryCompactor.cjs');
-const PipeAnimation = require('./components/PipeAnimation.cjs');
+const BinaryAnimation = require('./components/BinaryAnimation.cjs');
 const { spawn } = require('child_process');
 const os = require('os');
 
@@ -220,8 +220,8 @@ if (historyCompactor.isCompactionNeeded()) {
 // Create the chat UI
 const chatUI = new GradientChatUI();
 
-// Create the pipe animation
-const pipeAnimation = new PipeAnimation(chatUI);
+// Create the binary animation
+const binaryAnimation = new BinaryAnimation(chatUI);
 
 // Display welcome message with ASCII art
 chatUI.displayWelcomeMessage();
@@ -311,8 +311,8 @@ async function handleSlashCommand(text) {
       // Get the next agent for initialization
       const initAgent = agentManager.getNextAgent();
       if (initAgent) {
-        // Start the pipe animation
-        pipeAnimation.start();
+        // Start the binary animation with init prompt
+        binaryAnimation.start('Initializing project analysis');
         
         try {
           const globalTimeout = configManager.getGlobalTimeout();
@@ -333,8 +333,8 @@ async function handleSlashCommand(text) {
         } catch (error) {
           chatUI.addMessage(`Error initializing project: ${error.message}`, 'system');
         } finally {
-          // Stop the pipe animation
-          pipeAnimation.stop();
+          // Stop the binary animation
+          binaryAnimation.stop();
         }
       } else {
         chatUI.addMessage('No agents configured. Please add agents to ~/.termaite/settings.json', 'system');
@@ -430,8 +430,8 @@ chatUI.getInputBox().on('submit', async (text) => {
       // Show which agent is being used
       chatUI.addMessage(`[Using agent: ${agent.name}]`, 'system');
       
-      // Start the pipe animation
-      pipeAnimation.start();
+      // Start the binary animation with user's prompt
+      binaryAnimation.start(text);
       
       // Execute the agent command with global timeout
       try {
@@ -505,8 +505,8 @@ chatUI.getInputBox().on('submit', async (text) => {
           chatUI.addMessage('No alternative agents available', 'system');
         }
       } finally {
-        // Stop the pipe animation
-        pipeAnimation.stop();
+        // Stop the binary animation
+        binaryAnimation.stop();
         // Refocus after agent response
         chatUI.getInputBox().focus();
         chatUI.getScreen().render();
