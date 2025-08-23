@@ -8,25 +8,51 @@
 
 ## Commit Message Guidelines
 
-**IMPORTANT**: Commit messages are limited to 50 characters on the first line.
+**IMPORTANT**: This project follows [Conventional Commits](https://www.conventionalcommits.org/) specification.
 
-This is enforced by a git hook that will reject commits with longer messages.
+All commit messages must:
+1. Start with a type prefix (feat, fix, docs, etc.)
+2. Be limited to 50 characters on the first line
+3. Use present tense and imperative mood
+
+### Format:
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Allowed Types:
+- `feat` - A new feature
+- `fix` - A bug fix
+- `docs` - Documentation changes
+- `style` - Code style changes (formatting, etc)
+- `refactor` - Code refactoring
+- `perf` - Performance improvements
+- `test` - Adding or updating tests
+- `build` - Build system changes
+- `ci` - CI/CD changes
+- `chore` - Maintenance tasks
+- `revert` - Revert a previous commit
 
 ### Good Examples:
-- `Add user authentication feature`
-- `Fix memory leak in agent rotation`
-- `Update dependencies to latest versions`
-- `Refactor input handling for better performance`
+- `feat: add user authentication`
+- `fix(auth): resolve login timeout issue`
+- `docs: update README with examples`
+- `refactor: simplify input handling logic`
+- `perf: optimize history loading`
 
-### Bad Examples (too long):
-- `Add user authentication feature with OAuth2 and session management` ❌
-- `Fix memory leak in agent rotation when switching between multiple agents` ❌
+### Bad Examples:
+- `Updated commit hook` ❌ (missing type prefix)
+- `feat: add user authentication with OAuth2 and session management` ❌ (exceeds 50 chars)
+- `Fix bug` ❌ (missing type prefix, too vague)
 
 ### Tips:
-- Be concise and descriptive
-- Use present tense ("Add" not "Added")
-- Use imperative mood ("Fix" not "Fixes" or "Fixed")
-- If you need more detail, add it in the commit body (second paragraph)
+- Keep the first line under 50 characters
+- Use the body for detailed explanations if needed
+- Reference issues/PRs in the footer (e.g., "Closes #123")
 
 ## Publishing a New Version
 
