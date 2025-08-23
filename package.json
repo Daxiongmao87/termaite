@@ -18,13 +18,13 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node src/index.cjs",
-    "publish:patch": "node scripts/publish.js patch",
-    "publish:minor": "node scripts/publish.js minor",
-    "publish:major": "node scripts/publish.js major",
-    "publish:patch:dry": "node scripts/publish.js patch --dry-run",
-    "publish:minor:dry": "node scripts/publish.js minor --dry-run",
-    "publish:major:dry": "node scripts/publish.js major --dry-run",
-    "changelog": "node scripts/publish.js patch --dry-run",
+    "release": "standard-version",
+    "release:patch": "standard-version --release-as patch",
+    "release:minor": "standard-version --release-as minor",
+    "release:major": "standard-version --release-as major",
+    "release:dry": "standard-version --dry-run",
+    "release:first": "standard-version --first-release",
+    "postrelease": "git push --follow-tags origin master && npm publish",
     "prepare": "git config core.hooksPath .githooks"
   },
   "keywords": [
@@ -51,5 +51,8 @@
   "dependencies": {
     "blessed": "^0.1.81",
     "yargs": "^18.0.0"
+  },
+  "devDependencies": {
+    "standard-version": "^9.5.0"
   }
 }
