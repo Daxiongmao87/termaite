@@ -72,6 +72,27 @@ if (argv.prompt) {
     // Execute the agent command
     AgentWrapper.executeAgentCommand(agent, argv.prompt, historyManager.readHistory())
       .then(result => {
+        // Check if agent failed (non-zero exit code)
+        if (result.exitCode !== 0) {
+          console.error(`Agent ${agent.name} failed with exit code ${result.exitCode}`);
+          if (result.stderr) {
+            console.error('Error output:', result.stderr);
+          }
+          // Mark agent as failed and try next one
+          agentManager.markAgentAsFailed(agent.name);
+          
+          // Try to get another agent
+          const nextAgent = agentManager.getNextAgent();
+          if (nextAgent && nextAgent.name !== agent.name) {
+            console.error(`Retrying with agent: ${nextAgent.name}`);
+            // Recursively try with next agent
+            return AgentWrapper.executeAgentCommand(nextAgent, argv.prompt, historyManager.readHistory());
+          } else {
+            console.error('No alternative agents available');
+            process.exit(1);
+          }
+        }
+        
         console.log(result.stdout);
         // Add to history
         historyManager.writeHistory({
@@ -88,7 +109,41 @@ if (argv.prompt) {
       })
       .catch(error => {
         console.error('Error executing agent:', error.message);
-        process.exit(1);
+        agentManager.markAgentAsFailed(agent.name);
+        
+        // Try to get another agent
+        const nextAgent = agentManager.getNextAgent();
+        if (nextAgent && nextAgent.name !== agent.name) {
+          console.error(`Retrying with agent: ${nextAgent.name}`);
+          // Try with next agent
+          AgentWrapper.executeAgentCommand(nextAgent, argv.prompt, historyManager.readHistory())
+            .then(result => {
+              if (result.exitCode === 0) {
+                console.log(result.stdout);
+                // Add to history
+                historyManager.writeHistory({
+                  sender: 'user',
+                  text: argv.prompt,
+                  timestamp: new Date().toISOString()
+                });
+                historyManager.writeHistory({
+                  sender: 'agent',
+                  text: result.stdout,
+                  timestamp: new Date().toISOString()
+                });
+                process.exit(0);
+              } else {
+                console.error(`Agent ${nextAgent.name} also failed with exit code ${result.exitCode}`);
+                process.exit(1);
+              }
+            })
+            .catch(err => {
+              console.error('Error executing fallback agent:', err.message);
+              process.exit(1);
+            });
+        } else {
+          process.exit(1);
+        }
       });
   } else {
     console.error('No agents configured in ~/.termaite/settings.json');
@@ -379,17 +434,72 @@ chatUI.getInputBox().on('submit', async (text) => {
       try {
         const history = historyManager.readHistory();
         const result = await AgentWrapper.executeAgentCommand(agent, text, history);
-        chatUI.addMessage(result.stdout, 'agent');
         
-        // Add agent response to history
-        historyManager.writeHistory({
-          sender: 'agent',
-          text: result.stdout,
-          timestamp: new Date().toISOString()
-        });
+        // Check if agent failed (non-zero exit code)
+        if (result.exitCode !== 0) {
+          chatUI.addMessage(`Agent ${agent.name} failed with exit code ${result.exitCode}`, 'system');
+          if (result.stderr) {
+            chatUI.addMessage(`Error: ${result.stderr}`, 'system');
+          }
+          agentManager.markAgentAsFailed(agent.name);
+          
+          // Try next agent
+          const nextAgent = agentManager.getNextAgent();
+          if (nextAgent && nextAgent.name !== agent.name) {
+            chatUI.addMessage(`Retrying with agent: ${nextAgent.name}`, 'system');
+            const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history);
+            if (retryResult.exitCode === 0) {
+              chatUI.addMessage(retryResult.stdout, 'agent');
+              // Add agent response to history
+              historyManager.writeHistory({
+                sender: 'agent',
+                text: retryResult.stdout,
+                timestamp: new Date().toISOString()
+              });
+            } else {
+              chatUI.addMessage(`Agent ${nextAgent.name} also failed`, 'system');
+            }
+          } else {
+            chatUI.addMessage('No alternative agents available', 'system');
+          }
+        } else {
+          chatUI.addMessage(result.stdout, 'agent');
+          
+          // Add agent response to history
+          historyManager.writeHistory({
+            sender: 'agent',
+            text: result.stdout,
+            timestamp: new Date().toISOString()
+          });
+        }
       } catch (error) {
         chatUI.addMessage(`Error executing agent: ${error.message}`, 'system');
         agentManager.markAgentAsFailed(agent.name);
+        
+        // Try next agent
+        const nextAgent = agentManager.getNextAgent();
+        if (nextAgent && nextAgent.name !== agent.name) {
+          chatUI.addMessage(`Retrying with agent: ${nextAgent.name}`, 'system');
+          try {
+            const history = historyManager.readHistory();
+            const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history);
+            if (retryResult.exitCode === 0) {
+              chatUI.addMessage(retryResult.stdout, 'agent');
+              // Add agent response to history
+              historyManager.writeHistory({
+                sender: 'agent',
+                text: retryResult.stdout,
+                timestamp: new Date().toISOString()
+              });
+            } else {
+              chatUI.addMessage(`Agent ${nextAgent.name} also failed`, 'system');
+            }
+          } catch (retryError) {
+            chatUI.addMessage(`Fallback agent error: ${retryError.message}`, 'system');
+          }
+        } else {
+          chatUI.addMessage('No alternative agents available', 'system');
+        }
       } finally {
         // Stop the pipe animation
         pipeAnimation.stop();
