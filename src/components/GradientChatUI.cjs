@@ -1,4 +1,5 @@
 const blessed = require('blessed');
+const CustomInput = require('./CustomInput.cjs');
 
 class GradientChatUI {
   constructor() {
@@ -127,17 +128,14 @@ class GradientChatUI {
       }
     });
 
-    // Create the input box next to the prompt
-    this.inputBox = blessed.textbox({
+    // Create the custom input box next to the prompt
+    this.inputBox = new CustomInput({
       parent: this.inputContainer,
+      screen: this.screen,
       top: 0,
       left: 3, // Start after the prompt with space
       right: 0, // Extend to the right edge of container's content area
       height: 1,
-      tags: true,
-      inputOnFocus: true, // Enable input when focused
-      keys: true,         // Enable keyboard input
-      mouse: true,        // Enable mouse support
       style: {
         fg: 'white',
         bg: 'black'
