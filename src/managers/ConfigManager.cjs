@@ -22,12 +22,101 @@ class ConfigManager {
           fs.mkdirSync(configDir, { recursive: true });
         }
         
-        // Create a default config file
+        // Create a comprehensive default config file with examples
         const defaultConfig = {
-          rotationStrategy: 'round-robin',
-          agents: []
+          rotationStrategy: 'exhaustion',
+          globalTimeoutSeconds: null,  // Optional: override all agent timeouts
+          agents: [
+            {
+              name: "claude",
+              command: "claude --print --dangerously-skip-permissions",
+              contextWindowTokens: 200000,
+              timeoutSeconds: 300  // Optional: defaults to 300, use 0 for no timeout
+            },
+            {
+              name: "gemini",
+              command: "gemini --prompt --yolo",
+              contextWindowTokens: 1000000,
+              timeoutSeconds: 300
+            },
+            {
+              name: "qwen",
+              command: "qwen --prompt --yolo",
+              contextWindowTokens: 128000,
+              timeoutSeconds: 300
+            },
+            {
+              name: "cursor",
+              command: "cursor-agent --print --force --output-format text",
+              contextWindowTokens: 200000,
+              timeoutSeconds: 300
+            }
+          ]
         };
+        
+        // Add helpful comments as a separate file
+        const configWithComments = `{
+  // Rotation strategies: 'exhaustion' (default), 'round-robin', or 'random'
+  // - exhaustion: Always try agents in order, only moving to next on failure
+  // - round-robin: Rotate through agents for each request
+  // - random: Randomly select an agent for each request
+  "rotationStrategy": "exhaustion",
+  
+  // Global timeout override (optional)
+  // If set, overrides all individual agent timeouts
+  // Use null to disable global override, 0 for no timeout
+  "globalTimeoutSeconds": null,
+  
+  // Agent configurations
+  // Each agent needs: name, command, contextWindowTokens
+  // Optional: timeoutSeconds (defaults to 300)
+  "agents": [
+    {
+      "name": "claude",
+      "command": "claude --print --dangerously-skip-permissions",
+      "contextWindowTokens": 200000,
+      "timeoutSeconds": 300  // Optional: defaults to 300, use 0 for no timeout
+    },
+    {
+      "name": "gemini",
+      "command": "gemini --prompt --yolo",
+      "contextWindowTokens": 1000000,
+      "timeoutSeconds": 300
+    },
+    {
+      "name": "qwen",
+      "command": "qwen --prompt --yolo",
+      "contextWindowTokens": 128000,
+      "timeoutSeconds": 300
+    },
+    {
+      "name": "cursor",
+      "command": "cursor-agent --print --force --output-format text",
+      "contextWindowTokens": 200000,
+      "timeoutSeconds": 300
+    }
+    // Add more agents as needed
+    // For local models, you may need to include full command with model parameters
+    // Example for llxprt with local model:
+    // {
+    //   "name": "llxprt",
+    //   "command": "llxprt --baseurl \\"http://localhost:11434/v1/\\" -m \\"model-name\\" --yolo --prompt",
+    //   "contextWindowTokens": 20000,
+    //   "timeoutSeconds": 300
+    // }
+  ]
+}`;
+        
+        // Write the file without comments (JSON doesn't support comments)
         fs.writeFileSync(this.configPath, JSON.stringify(defaultConfig, null, 2));
+        
+        // Also create a template file with comments for reference
+        const templatePath = path.join(path.dirname(this.configPath), 'settings.template.jsonc');
+        fs.writeFileSync(templatePath, configWithComments);
+        
+        console.log(`Created default settings at ${this.configPath}`);
+        console.log(`Template with comments saved at ${templatePath}`);
+        
         return defaultConfig;
       }
       
