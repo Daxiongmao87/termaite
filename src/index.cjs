@@ -88,7 +88,21 @@ if (argv.prompt) {
         process.exit(1);
       });
   } else {
-    console.error('No agents available');
+    console.error('No agents configured in ~/.termaite/settings.json');
+    console.error('\nPlease add at least one agent to your settings.json file.');
+    console.error('Example agent configuration:\n');
+    console.error(JSON.stringify({
+      name: "claude-code",
+      command: "claude-code",
+      contextWindowTokens: 200000,
+      timeoutSeconds: 120
+    }, null, 2));
+    console.error('\nCommon agent commands:');
+    console.error('  claude-code     - Claude Code CLI');
+    console.error('  gemini-cli      - Gemini CLI');
+    console.error('  qwen-code       - Qwen Code CLI');
+    console.error('  cursor-agent    - Cursor Agent CLI');
+    console.error('  llxprt          - LLxprt CLI');
     process.exit(1);
   }
   
@@ -210,7 +224,8 @@ async function handleSlashCommand(text) {
           chatUI.addMessage(`Error compacting history: ${error.message}`, 'system');
         }
       } else {
-        chatUI.addMessage('No agents available for compaction', 'system');
+        chatUI.addMessage('No agents configured. Please add agents to ~/.termaite/settings.json', 'system');
+        chatUI.addMessage('Use /config to open the settings file', 'system');
       }
       break;
       
@@ -261,7 +276,8 @@ async function handleSlashCommand(text) {
           pipeAnimation.stop();
         }
       } else {
-        chatUI.addMessage('No agents available for initialization', 'system');
+        chatUI.addMessage('No agents configured. Please add agents to ~/.termaite/settings.json', 'system');
+        chatUI.addMessage('Use /config to open the settings file', 'system');
       }
       break;
       
@@ -376,7 +392,24 @@ chatUI.getInputBox().on('submit', async (text) => {
         chatUI.getScreen().render();
       }
     } else {
-      chatUI.addMessage('No agents available', 'system');
+      chatUI.addMessage('No agents configured in ~/.termaite/settings.json', 'system');
+      chatUI.addMessage('', 'system');
+      chatUI.addMessage('Please add at least one agent to your settings.json file.', 'system');
+      chatUI.addMessage('Use /config to open the settings file, then add an agent like:', 'system');
+      chatUI.addMessage('', 'system');
+      chatUI.addMessage(JSON.stringify({
+        name: "claude-code",
+        command: "claude-code",
+        contextWindowTokens: 200000,
+        timeoutSeconds: 120
+      }, null, 2), 'system');
+      chatUI.addMessage('', 'system');
+      chatUI.addMessage('Common agent commands:', 'system');
+      chatUI.addMessage('  claude-code     - Claude Code CLI', 'system');
+      chatUI.addMessage('  gemini-cli      - Gemini CLI', 'system');
+      chatUI.addMessage('  qwen-code       - Qwen Code CLI', 'system');
+      chatUI.addMessage('  cursor-agent    - Cursor Agent CLI', 'system');
+      chatUI.addMessage('  llxprt          - LLxprt CLI', 'system');
       chatUI.getInputBox().focus();
       chatUI.getScreen().render();
     }
