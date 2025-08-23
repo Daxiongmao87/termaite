@@ -1,18 +1,19 @@
 {
   "name": "termaite",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Multi-agent AI CLI wrapper with intelligent rotation, fallback, and conversation management",
   "engines": {
     "node": ">=18.0.0"
   },
   "type": "commonjs",
   "bin": {
-    "termaite": "./src/index.cjs"
+    "termaite": "src/index.cjs"
   },
   "files": [
     "src/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "termaite.jpg"
   ],
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -36,7 +37,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Daxiongmao87/termaite.git"
+    "url": "git+https://github.com/Daxiongmao87/termaite.git"
   },
   "homepage": "https://github.com/Daxiongmao87/termaite#readme",
   "dependencies": {
