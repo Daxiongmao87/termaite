@@ -1,10 +1,7 @@
 #!/bin/bash
 
-# Git commit-msg hook to enforce 50 character limit on first line
-# and prevent commits from being pushed if they exceed the limit
-
-commit_regex='^.{1,50}$'
-error_msg="Commit message first line exceeds 50 characters. Please shorten it."
+# Git commit-msg hook to enforce conventional commits and 50 character limit
+# Ensures commit messages follow the pattern: type(scope): subject
 
 # Read the commit message
 commit_msg=$(head -1 "$1")
@@ -19,14 +16,59 @@ fi
 
 # Check if it's a revert commit (allow slightly longer for reverts)
 if grep -q "^Revert" "$1"; then
-    commit_regex='^.{1,67}$'  # "Revert " + quoted message
+    # Revert commits are allowed, check for proper format
+    if ! echo "$commit_msg" | grep -qE '^Revert ".{1,50}"$'; then
+        echo "❌ ERROR: Invalid revert commit format"
+        echo "   Your message: \"$commit_msg\""
+        echo "   Expected format: Revert \"original commit message\""
+        exit 1
+    fi
+    exit 0
 fi
 
-# Check the length
-if ! echo "$commit_msg" | grep -qE "$commit_regex"; then
-    echo "❌ ERROR: $error_msg"
+# Define allowed commit types (Conventional Commits)
+allowed_types="feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert"
+
+# Check for conventional commit format
+# Pattern: type(scope): subject  OR  type: subject
+# The scope is optional
+conventional_regex="^($allowed_types)(\([a-z0-9\-]+\))?: .+"
+
+if ! echo "$commit_msg" | grep -qE "$conventional_regex"; then
+    echo "❌ ERROR: Commit message must follow Conventional Commits format"
+    echo ""
+    echo "   Your message: \"$commit_msg\""
+    echo ""
+    echo "   Required format: <type>[optional scope]: <description>"
+    echo ""
+    echo "   Examples:"
+    echo "     feat: add user authentication"
+    echo "     fix(auth): resolve login timeout issue"
+    echo "     docs: update README with new examples"
+    echo ""
+    echo "   Allowed types:"
+    echo "     feat     - A new feature"
+    echo "     fix      - A bug fix"
+    echo "     docs     - Documentation changes"
+    echo "     style    - Code style changes (formatting, etc)"
+    echo "     refactor - Code refactoring"
+    echo "     perf     - Performance improvements"
+    echo "     test     - Adding or updating tests"
+    echo "     build    - Build system changes"
+    echo "     ci       - CI/CD changes"
+    echo "     chore    - Maintenance tasks"
+    echo "     revert   - Revert a previous commit"
+    exit 1
+fi
+
+# Check the length (50 character limit for first line)
+if [ ${#commit_msg} -gt 50 ]; then
+    echo "❌ ERROR: Commit message first line exceeds 50 characters"
+    echo ""
     echo "   Your message: \"$commit_msg\""
     echo "   Length: ${#commit_msg} characters (max 50)"
+    echo ""
+    echo "   Tip: Keep the first line concise. Add details in the body if needed."
     exit 1
 fi
 
