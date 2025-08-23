@@ -128,7 +128,8 @@ class GradientChatUI {
     });
 
     // Create the input box next to the prompt
-    this.inputBox = blessed.textbox({
+    // Using textarea for better cursor control but limiting to single line
+    this.inputBox = blessed.textarea({
       parent: this.inputContainer,
       top: 0,
       left: 3, // Start after the prompt with space
@@ -140,8 +141,25 @@ class GradientChatUI {
       mouse: true,        // Enable mouse support
       style: {
         fg: 'white',
-        bg: 'black'
+        bg: 'black',
+        focus: {
+          fg: 'white',
+          bg: 'black'
+        }
       }
+    });
+    
+    // Setup enhanced keyboard navigation for the input box
+    this.setupInputNavigation();
+    
+    // Add submit functionality to textarea and prevent multiline
+    this.inputBox.key(['enter'], () => {
+      const value = this.inputBox.getValue();
+      // Don't allow newlines, use enter for submit
+      if (value !== undefined) {
+        this.inputBox.emit('submit', value.replace(/\n/g, ''));
+      }
+      return false; // Prevent default enter behavior (newline)
     });
 
     // Append main container to the screen
@@ -169,6 +187,63 @@ class GradientChatUI {
     this.screen.render();
   }
 
+  /**
+   * Setup enhanced keyboard navigation for input box
+   */
+  setupInputNavigation() {
+    // The blessed.textarea already supports:
+    // - Left/Right arrow keys for cursor movement
+    // - Home/End keys for beginning/end of line
+    // - Ctrl+A for beginning of line
+    // - Ctrl+E for end of line
+    // - Ctrl+Left/Right for word navigation (may need to add)
+    
+    // Add Ctrl+Left for word navigation backwards
+    this.inputBox.key(['C-left'], () => {
+      const value = this.inputBox.getValue();
+      let pos = this.inputBox.screen.program.x - this.inputBox.aleft - 1; // Current cursor position
+      
+      // Move cursor to previous word boundary
+      if (pos > 0) {
+        // Skip current whitespace
+        while (pos > 0 && /\s/.test(value[pos - 1])) {
+          pos--;
+        }
+        // Skip word characters
+        while (pos > 0 && !/\s/.test(value[pos - 1])) {
+          pos--;
+        }
+      }
+      
+      // Set cursor position
+      this.inputBox.screen.program.cup(this.inputBox.atop, this.inputBox.aleft + pos);
+      this.screen.render();
+    });
+    
+    // Add Ctrl+Right for word navigation forwards
+    this.inputBox.key(['C-right'], () => {
+      const value = this.inputBox.getValue();
+      let pos = this.inputBox.screen.program.x - this.inputBox.aleft - 1; // Current cursor position
+      const len = value.length;
+      
+      // Move cursor to next word boundary
+      if (pos < len) {
+        // Skip word characters
+        while (pos < len && !/\s/.test(value[pos])) {
+          pos++;
+        }
+        // Skip whitespace
+        while (pos < len && /\s/.test(value[pos])) {
+          pos++;
+        }
+      }
+      
+      // Set cursor position
+      this.inputBox.screen.program.cup(this.inputBox.atop, this.inputBox.aleft + pos);
+      this.screen.render();
+    });
+  }
+  
   /**
    * Setup scroll handlers for the chat box
    */
