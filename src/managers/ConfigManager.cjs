@@ -31,7 +31,8 @@ class ConfigManager {
               name: "claude",
               command: "claude --print --dangerously-skip-permissions",
               contextWindowTokens: 200000,
-              timeoutSeconds: 300  // Optional: defaults to 300, use 0 for no timeout
+              timeoutSeconds: 300,  // Optional: defaults to 300, use 0 for no timeout
+              instructionsFilepath: path.join(os.homedir(), '.claude', 'CLAUDE.md')  // Optional: path to propagate instructions
             },
             {
               name: "gemini",
@@ -69,13 +70,14 @@ class ConfigManager {
   
   // Agent configurations
   // Each agent needs: name, command, contextWindowTokens
-  // Optional: timeoutSeconds (defaults to 300)
+  // Optional: timeoutSeconds (defaults to 300), instructionsFilepath (path to propagate instructions)
   "agents": [
     {
       "name": "claude",
       "command": "claude --print --dangerously-skip-permissions",
       "contextWindowTokens": 200000,
-      "timeoutSeconds": 300  // Optional: defaults to 300, use 0 for no timeout
+      "timeoutSeconds": 300,  // Optional: defaults to 300, use 0 for no timeout
+      "instructionsFilepath": "/home/user/.claude/CLAUDE.md"  // Optional: path to propagate instructions from TERMAITE.md
     },
     {
       "name": "gemini",
@@ -182,6 +184,40 @@ class ConfigManager {
     } catch (error) {
       console.error('Error saving config:', error);
     }
+  }
+
+  /**
+   * Propagate instructions from TERMAITE.md to configured agent instruction files
+   */
+  propagateInstructions() {
+    const termaiteInstructionsPath = path.join(os.homedir(), '.termaite', 'TERMAITE.md');
+    
+    // Check if TERMAITE.md exists
+    if (!fs.existsSync(termaiteInstructionsPath)) {
+      return; // No instructions to propagate
+    }
+    
+    // Read the TERMAITE.md content
+    const instructions = fs.readFileSync(termaiteInstructionsPath, 'utf8');
+    
+    // Propagate to each agent that has an instructionsFilepath configured
+    const agents = this.getAgents();
+    agents.forEach(agent => {
+      if (agent.instructionsFilepath) {
+        try {
+          // Ensure the directory exists
+          const dir = path.dirname(agent.instructionsFilepath);
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+          }
+          
+          // Write the instructions to the agent's filepath
+          fs.writeFileSync(agent.instructionsFilepath, instructions, 'utf8');
+        } catch (error) {
+          console.error(`Failed to propagate instructions to ${agent.name}: ${error.message}`);
+        }
+      }
+    });
   }
 }
 

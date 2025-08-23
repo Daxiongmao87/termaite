@@ -11,6 +11,8 @@ const HistoryCompactor = require('./managers/HistoryCompactor.cjs');
 const SpinnerAnimation = require('./components/SpinnerAnimation.cjs');
 const { spawn } = require('child_process');
 const os = require('os');
+const path = require('path');
+const fs = require('fs');
 
 const argv = yargs(hideBin(process.argv))
   .option('continue', {
@@ -69,6 +71,9 @@ if (argv.prompt) {
     // Show which agent is being used in stderr so it doesn't interfere with stdout
     console.error(`[Using agent: ${agent.name}]`);
     
+    // Propagate instructions before executing agent command
+    configManager.propagateInstructions();
+    
     // Execute the agent command with global timeout
     const globalTimeout = configManager.getGlobalTimeout();
     AgentWrapper.executeAgentCommand(agent, argv.prompt, historyManager.readHistory(), globalTimeout)
@@ -86,6 +91,8 @@ if (argv.prompt) {
           const nextAgent = agentManager.getNextAgent();
           if (nextAgent && nextAgent.name !== agent.name) {
             console.error(`Retrying with agent: ${nextAgent.name}`);
+            // Propagate instructions before retry
+            configManager.propagateInstructions();
             // Recursively try with next agent
             return AgentWrapper.executeAgentCommand(nextAgent, argv.prompt, historyManager.readHistory(), globalTimeout);
           } else {
@@ -267,6 +274,7 @@ async function handleSlashCommand(text) {
       chatUI.addMessage('/switch <agent> - Switch to a specific agent', 'system');
       chatUI.addMessage('/init - Initialize the project', 'system');
       chatUI.addMessage('/config - Open the configuration file', 'system');
+      chatUI.addMessage('/instructions - Edit global agent instructions', 'system');
       break;
       
     case 'compact':
@@ -316,6 +324,7 @@ async function handleSlashCommand(text) {
         
         try {
           const globalTimeout = configManager.getGlobalTimeout();
+          configManager.propagateInstructions();
           const result = await AgentWrapper.executeAgentCommand(
             initAgent, 
             'Please investigate the current project and write comprehensive yet high-level details of the project and general guidelines in working in it.', 
@@ -342,6 +351,29 @@ async function handleSlashCommand(text) {
       }
       break;
       
+    case 'instructions':
+      const instructionsPath = path.join(os.homedir(), '.termaite', 'TERMAITE.md');
+      const instructionsEditor = process.env.EDITOR || 'vi';
+      
+      chatUI.addMessage(`Opening instructions file: ${instructionsPath}`, 'system');
+      chatUI.getScreen().render();
+      
+      // Use blessed's built-in exec method for proper terminal handling
+      chatUI.getScreen().exec(instructionsEditor, [instructionsPath], {}, (err, success) => {
+        if (!err) {
+          chatUI.addMessage('Instructions file closed', 'system');
+          // Propagate instructions to configured agents
+          configManager.propagateInstructions();
+        } else {
+          chatUI.addMessage(`Editor error: ${err.message}`, 'system');
+        }
+        
+        // Refocus the input box
+        chatUI.getInputBox().focus();
+        chatUI.getScreen().render();
+      });
+      break;
+      
     case 'config':
       const configPath = configManager.configPath;
       const editor = process.env.EDITOR || 'vi';
@@ -349,27 +381,16 @@ async function handleSlashCommand(text) {
       chatUI.addMessage(`Opening config file: ${configPath}`, 'system');
       chatUI.getScreen().render();
       
-      // Hide the screen before launching editor
-      chatUI.getScreen().leave();
-      
-      const editorProcess = spawn(editor, [configPath], {
-        stdio: 'inherit',
-        shell: true
-      });
-      
-      editorProcess.on('close', (code) => {
-        // Restore the screen after editor closes
-        chatUI.getScreen().enter();
-        chatUI.getScreen().render();
-        
-        if (code === 0) {
+      // Use blessed's built-in exec method for proper terminal handling
+      chatUI.getScreen().exec(editor, [configPath], {}, (err, success) => {
+        if (!err) {
           chatUI.addMessage('Config file closed', 'system');
           // Reload the config
           configManager.config = configManager.loadConfig();
           agentManager.agents = configManager.getAgents();
           agentManager.rotationStrategy = configManager.getRotationStrategy();
         } else {
-          chatUI.addMessage(`Editor exited with code ${code}`, 'system');
+          chatUI.addMessage(`Editor error: ${err.message}`, 'system');
         }
         
         // Refocus the input box
@@ -433,6 +454,9 @@ chatUI.getInputBox().on('submit', async (text) => {
       // Start the spinner animation
       spinnerAnimation.start();
       
+      // Propagate instructions before executing agent command
+      configManager.propagateInstructions();
+      
       // Execute the agent command with global timeout
       try {
         const history = historyManager.readHistory();
@@ -451,6 +475,7 @@ chatUI.getInputBox().on('submit', async (text) => {
           const nextAgent = agentManager.getNextAgent();
           if (nextAgent && nextAgent.name !== agent.name) {
             chatUI.addMessage(`Agent (${nextAgent.name}):`, 'system');
+            configManager.propagateInstructions();
             const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
             if (retryResult.exitCode === 0) {
               chatUI.addMessage(retryResult.stdout, 'agent');
@@ -486,6 +511,7 @@ chatUI.getInputBox().on('submit', async (text) => {
           chatUI.addMessage(`Agent (${nextAgent.name}):`, 'system');
           try {
             const history = historyManager.readHistory();
+            configManager.propagateInstructions();
             const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
             if (retryResult.exitCode === 0) {
               chatUI.addMessage(retryResult.stdout, 'agent');
