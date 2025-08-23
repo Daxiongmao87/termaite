@@ -218,7 +218,7 @@ if (historyCompactor.isCompactionNeeded()) {
 }
 
 // Create the chat UI
-const chatUI = new GradientChatUI();
+const chatUI = new GradientChatUI(historyManager);
 
 // Create the spinner animation
 const spinnerAnimation = new SpinnerAnimation(chatUI);
