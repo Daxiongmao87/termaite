@@ -93,16 +93,16 @@ if (argv.prompt) {
     console.error('Example agent configuration:\n');
     console.error(JSON.stringify({
       name: "claude",
-      command: "claude --print",
+      command: "claude --print --dangerously-skip-permissions",
       contextWindowTokens: 200000,
       timeoutSeconds: 120
     }, null, 2));
-    console.error('\nCommon agent commands (non-interactive modes):');
-    console.error('  claude --print        - Claude Code CLI');
-    console.error('  gemini --prompt       - Gemini CLI (use -p or --prompt)');
-    console.error('  qwen --prompt         - Qwen Code CLI (use -p or --prompt)');
-    console.error('  cursor-agent --print  - Cursor Agent CLI');
-    console.error('  llxprt --prompt       - LLxprt CLI (use -p or --prompt)');
+    console.error('\nCommon agent commands (non-interactive modes with permission bypass):');
+    console.error('  claude --print --dangerously-skip-permissions');
+    console.error('  gemini --prompt --yolo');
+    console.error('  qwen --prompt --yolo');
+    console.error('  cursor-agent --print --force');
+    console.error('  llxprt --prompt --yolo');
     process.exit(1);
   }
   
@@ -399,17 +399,17 @@ chatUI.getInputBox().on('submit', async (text) => {
       chatUI.addMessage('', 'system');
       chatUI.addMessage(JSON.stringify({
         name: "claude",
-        command: "claude --print",
+        command: "claude --print --dangerously-skip-permissions",
         contextWindowTokens: 200000,
         timeoutSeconds: 120
       }, null, 2), 'system');
       chatUI.addMessage('', 'system');
-      chatUI.addMessage('Common agent commands (non-interactive modes):', 'system');
-      chatUI.addMessage('  claude --print        - Claude Code CLI', 'system');
-      chatUI.addMessage('  gemini --prompt       - Gemini CLI (use -p or --prompt)', 'system');
-      chatUI.addMessage('  qwen --prompt         - Qwen Code CLI (use -p or --prompt)', 'system');
-      chatUI.addMessage('  cursor-agent --print  - Cursor Agent CLI', 'system');
-      chatUI.addMessage('  llxprt --prompt       - LLxprt CLI (use -p or --prompt)', 'system');
+      chatUI.addMessage('Common agent commands (non-interactive modes with permission bypass):', 'system');
+      chatUI.addMessage('  claude --print --dangerously-skip-permissions', 'system');
+      chatUI.addMessage('  gemini --prompt --yolo', 'system');
+      chatUI.addMessage('  qwen --prompt --yolo', 'system');
+      chatUI.addMessage('  cursor-agent --print --force', 'system');
+      chatUI.addMessage('  llxprt --prompt --yolo', 'system');
       chatUI.getInputBox().focus();
       chatUI.getScreen().render();
     }
