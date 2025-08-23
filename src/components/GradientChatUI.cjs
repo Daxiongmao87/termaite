@@ -89,18 +89,18 @@ class GradientChatUI {
       }
     });
 
-    // Create a 1x1 pipe animation box inside the main container
+    // Create a binary animation box inside the main container
     this.pipeAnimationBox = blessed.box({
       parent: this.mainContainer,
       bottom: 5, // Positioned above the input box
       left: 'center', // Center it horizontally
-      width: 3, // Small width for single character plus padding
+      width: 80, // Wide enough for binary strings
       height: 1,
       content: ' ',
       tags: true,
       align: 'center',
       style: {
-        fg: '#00FFFF', // Cyan color for the pipe animation
+        fg: '#00FFFF', // Cyan color for the animation
         bg: 'black'
       }
     });
