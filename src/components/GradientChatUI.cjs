@@ -152,14 +152,20 @@ class GradientChatUI {
     // Setup scrolling event handlers
     this.setupScrollHandlers();
 
-    // Handle Ctrl+C to exit - set this up before focusing input
+    // Handle Ctrl+C - clear input if not empty, exit if empty
     this.screen.key(['C-c'], () => {
-      this.screen.leave();
-      process.exit(0);
+      if (this.inputBox.getValue() === '') {
+        // Input is empty, exit the app
+        this.screen.leave();
+        process.exit(0);
+      } else {
+        // Input has content, clear it
+        this.inputBox.clearValue();
+      }
     });
 
-    // Also handle escape and q
-    this.screen.key(['escape', 'q'], () => {
+    // Handle q to quit (but not escape, as that's for clearing input)
+    this.screen.key(['q'], () => {
       this.screen.leave();
       process.exit(0);
     });

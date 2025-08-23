@@ -236,6 +236,7 @@ class CustomInput {
     this.value = '';
     this.cursorPos = 0;
     this.scrollOffset = 0;
+    this.resetHistoryNavigation();
     this.render();
   }
   
