@@ -23,9 +23,11 @@
 
 ---
 
+> ⚠️ **Early Alpha**: This project is under active development. Expect rapid changes and potential breaking updates. Review the Safety Disclaimer and use in non-production environments.
+
 ## ✨ Why TERMAITE?
 
-TERMAITE orchestrates multiple AI CLI agents (Claude, Gemini, Qwen, Cursor, etc.) into a unified interface with intelligent rotation and automatic failover. Never lose a conversation due to rate limits or service outages again.
+TERMAITE orchestrates multiple AI CLI agents into a unified interface with intelligent rotation and automatic failover. Never lose a conversation due to rate limits or service outages again.
 
 <div align="center">
   <img src="https://github.com/Daxiongmao87/termaite/assets/demo.gif" alt="TERMAITE in action" width="800">
@@ -44,7 +46,7 @@ npx termaite
 
 ### Prerequisites
 - Node.js >= 18.0.0
-- At least one AI CLI agent installed ([Claude](https://claude.ai/download), [Gemini](https://github.com/google/generative-ai-docs), [Qwen](https://github.com/QwenLM/Qwen), etc.)
+- At least one CLI-accessible AI agent installed and configured (user-provided; see your chosen agent’s documentation)
 
 ## ⚠️ Safety Disclaimer
 
@@ -60,7 +62,7 @@ TERMAITE can invoke external CLI agents that you configure. Granting agents full
 ```bash
 termaite
 ```
-On first run, TERMAITE automatically creates a working configuration with common agents at `~/.termaite/settings.json`.
+On first run, TERMAITE creates a starter configuration file at `~/.termaite/settings.json`. You control which agents to add and how they are invoked.
 
 ### 2. Interactive Chat
 ```bash
