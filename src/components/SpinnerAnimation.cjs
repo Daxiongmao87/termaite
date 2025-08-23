@@ -53,9 +53,9 @@ class SpinnerAnimation {
     
     // Get current spinner frame with color
     const frame = this.spinnerFrames[this.currentFrame];
-    const display = `{${this.currentColor}-fg}${frame}{/${this.currentColor}-fg}`;
+    const display = `  {${this.currentColor}-fg}${frame}{/${this.currentColor}-fg}`;
     
-    // Position spinner one line below the last chat message
+    // Update spinner in chat log
     this.chatUI.setProgressBar(display);
     
     // Move to next frame
