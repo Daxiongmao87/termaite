@@ -43,6 +43,17 @@ if (argv.prompt) {
   // Create the history manager
   const historyManager = new HistoryManager(process.cwd());
   
+  // Handle --continue flag in non-interactive mode
+  if (argv.continue) {
+    const mostRecentHistoryPath = HistoryManager.getMostRecentProject();
+    if (mostRecentHistoryPath) {
+      const loadedHistory = HistoryManager.loadHistoryFromPath(mostRecentHistoryPath);
+      if (loadedHistory.length > 0) {
+        historyManager.replaceHistory(loadedHistory);
+      }
+    }
+  }
+  
   // Create the agent manager
   const agentManager = new AgentManager(configManager);
   
