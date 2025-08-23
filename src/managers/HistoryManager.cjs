@@ -19,14 +19,9 @@ class HistoryManager {
   createProjectSlug(projectPath) {
     // Get the absolute path to ensure consistency
     const absolutePath = path.resolve(projectPath);
-    // Create a hash of the full path to ensure uniqueness
-    const hash = crypto.createHash('md5').update(absolutePath).digest('hex');
-    // Get the basename for readability
-    const basename = path.basename(absolutePath);
-    // Create a safe slug from basename
-    const safeBasename = basename.replace(/[^a-zA-Z0-9-_]/g, '-').replace(/^-+|-+$/g, '').toLowerCase();
-    // Combine basename with first 8 chars of hash for uniqueness
-    return `${safeBasename}_${hash.substring(0, 8)}`;
+    // Replace slashes with dashes, following Claude's naming convention
+    // e.g., /home/patrick/Projects/term.ai.te becomes -home-patrick-Projects-term.ai.te
+    return absolutePath.replace(/\//g, '-');
   }
 
   /**
