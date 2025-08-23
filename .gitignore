@@ -17,11 +17,13 @@ npm-debug.log*
 .vscode/
 
 # Agent markdown and temp files
+.claude
 .claude/
 GEMINI.md
 CLAUDE.md
 LLXPRT.md
 QWEN.md
+DEVELOPMENT.md
 hello_world.cjs
 idea.md
 
