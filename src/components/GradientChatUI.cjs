@@ -221,12 +221,16 @@ class GradientChatUI {
    * @returns {string} The formatted title text
    */
   getGradientTitleText() {
-    // Apply colors: TERM = red, AI = white, TE = blue
-    const term = '{red-fg}term{/red-fg}';
+    // Apply gradient: t=red, e=yellow, r=green, m=cyan, ai=white, t=blue, e=magenta
+    const t1 = '{red-fg}t{/red-fg}';
+    const e1 = '{yellow-fg}e{/yellow-fg}';
+    const r = '{green-fg}r{/green-fg}';
+    const m = '{cyan-fg}m{/cyan-fg}';
     const ai = '{white-fg}ai{/white-fg}';
-    const te = '{blue-fg}te{/blue-fg}';
+    const t2 = '{blue-fg}t{/blue-fg}';
+    const e2 = '{magenta-fg}e{/magenta-fg}';
     
-    return ` [ ${term}${ai}${te} ] `;
+    return ` [ ${t1}${e1}${r}${m}${ai}${t2}${e2} ] `;
   }
 
   /**
@@ -351,16 +355,17 @@ class GradientChatUI {
    * @returns {string} The formatted ASCII art
    */
   generateAsciiArt() {
-    // Large ASCII art for TERMAITE with colors: TERM = red, AI = white, TE = blue
+    // Large ASCII art for TERMAITE with gradient colors
+    // T = red, E = yellow, R = green, M = cyan, AI = white, T = blue, E = magenta
     const lines = [
-      '{center}{red-fg}███████████ ██████████ ███████████   ██████   ██████{/red-fg}   {white-fg}█████████   █████{/white-fg} {blue-fg}███████████ ██████████{/blue-fg}{/center}',
-      '{center}{red-fg}░█░░░███░░░█░░███░░░░░█░░███░░░░░███ ░░██████ ██████{/red-fg}   {white-fg}███░░░░░███ ░░███{/white-fg} {blue-fg}░█░░░███░░░█░░███░░░░░█{/blue-fg}{/center}',
-      '{center}{red-fg}░   ░███  ░  ░███  █ ░  ░███    ░███  ░███░█████░███{/red-fg}  {white-fg}░███    ░███  ░███{/white-fg} {blue-fg}░   ░███  ░  ░███  █ ░{/blue-fg} {/center}',
-      '{center}    {red-fg}░███     ░██████    ░██████████   ░███░░███ ░███{/red-fg}  {white-fg}░███████████  ░███{/white-fg}     {blue-fg}░███     ░██████{/blue-fg}   {/center}',
-      '{center}    {red-fg}░███     ░███░░█    ░███░░░░░███  ░███ ░░░  ░███{/red-fg}  {white-fg}░███░░░░░███  ░███{/white-fg}     {blue-fg}░███     ░███░░█{/blue-fg}   {/center}',
-      '{center}    {red-fg}░███     ░███ ░   █ ░███    ░███  ░███      ░███{/red-fg}  {white-fg}░███    ░███  ░███{/white-fg}     {blue-fg}░███     ░███ ░   █{/blue-fg}{/center}',
-      '{center}    {red-fg}█████    ██████████ █████   █████ █████     █████{/red-fg} {white-fg}█████   █████ █████{/white-fg}    {blue-fg}█████    ██████████{/blue-fg}{/center}',
-      '{center}   {red-fg}░░░░░    ░░░░░░░░░░ ░░░░░   ░░░░░ ░░░░░     ░░░░░{/red-fg} {white-fg}░░░░░   ░░░░░ ░░░░░{/white-fg}    {blue-fg}░░░░░    ░░░░░░░░░░{/blue-fg} {/center}'
+      '{center}{red-fg}███████████{/red-fg} {yellow-fg}██████████{/yellow-fg} {green-fg}███████████{/green-fg}   {cyan-fg}██████   ██████{/cyan-fg}   {white-fg}█████████   █████{/white-fg} {blue-fg}███████████{/blue-fg} {magenta-fg}██████████{/magenta-fg}{/center}',
+      '{center}{red-fg}░█░░░███░░░█{/red-fg}{yellow-fg}░░███░░░░░█{/yellow-fg}{green-fg}░░███░░░░░███{/green-fg} {cyan-fg}░░██████ ██████{/cyan-fg}   {white-fg}███░░░░░███ ░░███{/white-fg} {blue-fg}░█░░░███░░░█{/blue-fg}{magenta-fg}░░███░░░░░█{/magenta-fg}{/center}',
+      '{center}{red-fg}░   ░███  ░{/red-fg}  {yellow-fg}░███  █ ░{/yellow-fg}  {green-fg}░███    ░███{/green-fg}  {cyan-fg}░███░█████░███{/cyan-fg}  {white-fg}░███    ░███  ░███{/white-fg} {blue-fg}░   ░███  ░{/blue-fg}  {magenta-fg}░███  █ ░{/magenta-fg} {/center}',
+      '{center}    {red-fg}░███{/red-fg}     {yellow-fg}░██████{/yellow-fg}    {green-fg}░██████████{/green-fg}   {cyan-fg}░███░░███ ░███{/cyan-fg}  {white-fg}░███████████  ░███{/white-fg}     {blue-fg}░███{/blue-fg}     {magenta-fg}░██████{/magenta-fg}   {/center}',
+      '{center}    {red-fg}░███{/red-fg}     {yellow-fg}░███░░█{/yellow-fg}    {green-fg}░███░░░░░███{/green-fg}  {cyan-fg}░███ ░░░  ░███{/cyan-fg}  {white-fg}░███░░░░░███  ░███{/white-fg}     {blue-fg}░███{/blue-fg}     {magenta-fg}░███░░█{/magenta-fg}   {/center}',
+      '{center}    {red-fg}░███{/red-fg}     {yellow-fg}░███ ░   █{/yellow-fg} {green-fg}░███    ░███{/green-fg}  {cyan-fg}░███      ░███{/cyan-fg}  {white-fg}░███    ░███  ░███{/white-fg}     {blue-fg}░███{/blue-fg}     {magenta-fg}░███ ░   █{/magenta-fg}{/center}',
+      '{center}    {red-fg}█████{/red-fg}    {yellow-fg}██████████{/yellow-fg} {green-fg}█████   █████{/green-fg} {cyan-fg}█████     █████{/cyan-fg} {white-fg}█████   █████ █████{/white-fg}    {blue-fg}█████{/blue-fg}    {magenta-fg}██████████{/magenta-fg}{/center}',
+      '{center}   {red-fg}░░░░░{/red-fg}    {yellow-fg}░░░░░░░░░░{/yellow-fg} {green-fg}░░░░░   ░░░░░{/green-fg} {cyan-fg}░░░░░     ░░░░░{/cyan-fg} {white-fg}░░░░░   ░░░░░ ░░░░░{/white-fg}    {blue-fg}░░░░░{/blue-fg}    {magenta-fg}░░░░░░░░░░{/magenta-fg} {/center}'
     ];
     
     return lines.join('\n');
