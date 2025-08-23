@@ -89,16 +89,15 @@ class GradientChatUI {
       }
     });
 
-    // Create a binary animation box inside the main container
+    // Create a spinner animation box inside the main container
     this.pipeAnimationBox = blessed.box({
       parent: this.mainContainer,
       bottom: 5, // Positioned above the input box
-      left: 'center', // Center it horizontally
-      width: 80, // Wide enough for binary strings
+      left: 2, // Align with chat content padding
+      width: 4, // Just wide enough for the spinner
       height: 1,
       content: ' ',
       tags: true,
-      align: 'center',
       style: {
         fg: '#00FFFF', // Cyan color for the animation
         bg: 'black'
@@ -299,8 +298,8 @@ class GradientChatUI {
   }
 
   /**
-   * Set the pipe animation character
-   * @param {string} content - The pipe character to display
+   * Set the spinner animation character
+   * @param {string} content - The spinner character to display
    */
   setProgressBar(content) {
     this.pipeAnimationBox.content = content;
@@ -308,7 +307,7 @@ class GradientChatUI {
   }
 
   /**
-   * Clear the pipe animation
+   * Clear the spinner animation
    */
   clearProgressBar() {
     this.pipeAnimationBox.content = ' ';
