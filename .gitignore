@@ -13,6 +13,9 @@ npm-debug.log*
 .idea/
 .copilot*/
 
+# Editor settings
+.vscode/
+
 # Agent markdown and temp files
 GEMINI.md
 CLAUDE.md
@@ -29,3 +32,16 @@ src/test-*.cjs
 *.swp
 *~
 *.tmp
+
+# Build artifacts and caches
+dist/
+build/
+coverage/
+.coverage
+coverage.xml
+.parcel-cache/
+.turbo/
+.cache/
+
+# OS-specific junk
+Thumbs.db
