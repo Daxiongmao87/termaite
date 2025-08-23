@@ -1,0 +1,33 @@
+#!/bin/bash
+
+# Git commit-msg hook to enforce 50 character limit on first line
+# and prevent commits from being pushed if they exceed the limit
+
+commit_regex='^.{1,50}$'
+error_msg="Commit message first line exceeds 50 characters. Please shorten it."
+
+# Read the commit message
+commit_msg=$(head -1 "$1")
+
+# Remove any leading/trailing whitespace
+commit_msg=$(echo "$commit_msg" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
+# Check if it's a merge commit (skip validation for merges)
+if grep -q "^Merge" "$1"; then
+    exit 0
+fi
+
+# Check if it's a revert commit (allow slightly longer for reverts)
+if grep -q "^Revert" "$1"; then
+    commit_regex='^.{1,67}$'  # "Revert " + quoted message
+fi
+
+# Check the length
+if ! echo "$commit_msg" | grep -qE "$commit_regex"; then
+    echo "❌ ERROR: $error_msg"
+    echo "   Your message: \"$commit_msg\""
+    echo "   Length: ${#commit_msg} characters (max 50)"
+    exit 1
+fi
+
+exit 0
