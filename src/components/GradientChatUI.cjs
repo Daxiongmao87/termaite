@@ -11,6 +11,10 @@ class GradientChatUI {
 
     // Track raw messages with tags for proper rendering
     this.rawMessages = [];
+    
+    // Track spinner state
+    this.spinnerLineIndex = -1;
+    this.isSpinnerShowing = false;
 
     // Define gradient colors (simplified for terminal)
     // Using a range of blue to cyan colors
@@ -66,7 +70,7 @@ class GradientChatUI {
       top: 0,
       left: 0,
       width: '100%-2',
-      height: '100%-6', // Leave space for progress bar and input with margins
+      height: '100%-4', // Leave space for input with margins
       content: '',
       tags: true,
       padding: {
@@ -89,20 +93,6 @@ class GradientChatUI {
       }
     });
 
-    // Create a spinner animation box inside the main container
-    this.pipeAnimationBox = blessed.box({
-      parent: this.mainContainer,
-      bottom: 5, // Positioned above the input box
-      left: 2, // Align with chat content padding
-      width: 4, // Just wide enough for the spinner
-      height: 1,
-      content: ' ',
-      tags: true,
-      style: {
-        fg: '#00FFFF', // Cyan color for the animation
-        bg: 'black'
-      }
-    });
 
     // Create a container for the prompt and input
     this.inputContainer = blessed.box({
@@ -302,7 +292,23 @@ class GradientChatUI {
    * @param {string} content - The spinner character to display
    */
   setProgressBar(content) {
-    this.pipeAnimationBox.content = content;
+    // If spinner is already showing, remove the old line
+    if (this.isSpinnerShowing) {
+      // Get the current lines from the log
+      const lines = this.chatBox.getLines();
+      // Remove the last line (which should be the spinner)
+      if (lines.length > 0 && lines[lines.length - 1].includes('◜') || 
+          lines[lines.length - 1].includes('◝') || 
+          lines[lines.length - 1].includes('◞') || 
+          lines[lines.length - 1].includes('◟')) {
+        lines.pop();
+        this.chatBox.setContent(lines.join('\n'));
+      }
+    }
+    
+    // Add the new spinner line
+    this.chatBox.add(content);
+    this.isSpinnerShowing = true;
     this.screen.render();
   }
 
@@ -310,7 +316,19 @@ class GradientChatUI {
    * Clear the spinner animation
    */
   clearProgressBar() {
-    this.pipeAnimationBox.content = ' ';
+    if (this.isSpinnerShowing) {
+      // Get the current lines from the log
+      const lines = this.chatBox.getLines();
+      // Remove the last line if it's the spinner
+      if (lines.length > 0 && (lines[lines.length - 1].includes('◜') || 
+          lines[lines.length - 1].includes('◝') || 
+          lines[lines.length - 1].includes('◞') || 
+          lines[lines.length - 1].includes('◟'))) {
+        lines.pop();
+        this.chatBox.setContent(lines.join('\n'));
+      }
+      this.isSpinnerShowing = false;
+    }
     this.screen.render();
   }
 
