@@ -1,9 +1,18 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+### [0.2.1](https://github.com/Daxiongmao87/termaite/compare/v0.2.0...v0.2.1) (2025-08-23)
+
+
+### 📦 Build System
+
+* switch to standard-version for releases ([af4cbcc](https://github.com/Daxiongmao87/termaite/commit/af4cbccff9f43f12aacb0876a0e6910fd07bcfcf))
+
+
+### 🔧 Chores
+
+* remove defunct publish script ([6d87e27](https://github.com/Daxiongmao87/termaite/commit/6d87e27f27b3a07e060d941d9084ec2c68696b74))
 
 ## [0.2.0] - 2025-08-23
 
