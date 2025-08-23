@@ -1,10 +1,45 @@
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
 class AgentManager {
   constructor(configManager) {
     this.configManager = configManager;
     this.agents = configManager.getAgents();
     this.rotationStrategy = configManager.getRotationStrategy();
-    this.currentAgentIndex = 0;
+    this.statePath = path.join(os.homedir(), '.termaite', 'state.json');
+    this.currentAgentIndex = this.loadState();
     this.failedAgents = new Map(); // Map to track failed agents and their cooldown periods
+  }
+  
+  /**
+   * Load the current agent index from state file
+   * @returns {number} The current agent index
+   */
+  loadState() {
+    try {
+      if (fs.existsSync(this.statePath)) {
+        const state = JSON.parse(fs.readFileSync(this.statePath, 'utf8'));
+        return state.currentAgentIndex || 0;
+      }
+    } catch (error) {
+      // Ignore errors, return default
+    }
+    return 0;
+  }
+  
+  /**
+   * Save the current agent index to state file
+   */
+  saveState() {
+    try {
+      const state = {
+        currentAgentIndex: this.currentAgentIndex
+      };
+      fs.writeFileSync(this.statePath, JSON.stringify(state, null, 2));
+    } catch (error) {
+      // Ignore errors
+    }
   }
 
   /**
@@ -44,9 +79,25 @@ class AgentManager {
    * @returns {object} The next agent
    */
   getNextAgentRoundRobin(availableAgents) {
-    const agent = availableAgents[this.currentAgentIndex % availableAgents.length];
-    this.currentAgentIndex = (this.currentAgentIndex + 1) % availableAgents.length;
-    return agent;
+    // Round-robin: Rotate through all agents in order
+    // Keep incrementing until we find an available agent
+    for (let i = 0; i < this.agents.length; i++) {
+      const index = (this.currentAgentIndex + i) % this.agents.length;
+      const agent = this.agents[index];
+      const availableAgent = availableAgents.find(a => a.name === agent.name);
+      
+      if (availableAgent) {
+        // Move to next agent for next call
+        this.currentAgentIndex = (index + 1) % this.agents.length;
+        this.saveState(); // Save the updated index
+        return availableAgent;
+      }
+    }
+    
+    // If no agents available, reset index and return first available
+    this.currentAgentIndex = 0;
+    this.saveState();
+    return availableAgents[0];
   }
 
   /**
@@ -55,10 +106,20 @@ class AgentManager {
    * @returns {object} The next agent
    */
   getNextAgentExhaustion(availableAgents) {
-    // For exhaustion, we keep using the same agent until it fails
-    // For now, we'll just return the current agent
-    // In a more advanced implementation, we'd track agent failures
-    return availableAgents[this.currentAgentIndex % availableAgents.length];
+    // Exhaustion strategy: Always try agents in priority order (list order)
+    // Try the first available agent in the original list order
+    for (let i = 0; i < this.agents.length; i++) {
+      const agent = this.agents[i];
+      const availableAgent = availableAgents.find(a => a.name === agent.name);
+      
+      if (availableAgent) {
+        // Found the highest priority available agent
+        return availableAgent;
+      }
+    }
+    
+    // No agents available (shouldn't happen as we check earlier)
+    return availableAgents[0];
   }
 
   /**
