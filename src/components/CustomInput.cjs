@@ -112,7 +112,7 @@ class CustomInput {
         handled = true;
       } else if (ch && !key.ctrl && !key.meta) {
         // Regular character input
-        if (!/^[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f]$/.test(ch)) {
+        if (!/^[\x00-\x08\x0b-\x0c\x0e-\x1f\x7f\x0d]$/.test(ch)) {
           this.value = this.value.slice(0, this.cursorPos) + ch + this.value.slice(this.cursorPos);
           this.cursorPos++;
           handled = true;
