@@ -457,10 +457,13 @@ chatUI.getInputBox().on('submit', async (text) => {
       agent = agentManager.getNextAgent();
     }
     if (agent) {
-      // Show which agent is being used
-      chatUI.addMessage(`Agent (${agent.name}):`, 'system');
+      // Show which agent is being used with color coding
+      const colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan'];
+      const colorIndex = agent.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+      const color = colors[colorIndex];
+      chatUI.addMessage(`{bold}{${color}-fg}Agent (${agent.name}):{/${color}-fg}{/bold}`, 'system');
       
-      // Track that we added 2 messages (user + agent) for cancellation
+      // Track that we added 2 messages (user + agent announcement) for cancellation
       const messagesToRevert = 2;
       
       // Mark agent as running
@@ -516,11 +519,14 @@ chatUI.getInputBox().on('submit', async (text) => {
             // Try next agent
             const nextAgent = agentManager.getNextAgent();
             if (nextAgent && nextAgent.name !== agent.name) {
-              chatUI.addMessage(`Agent (${nextAgent.name}):`, 'system');
+              const colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan'];
+              const colorIndex = nextAgent.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+              const color = colors[colorIndex];
+              chatUI.addMessage(`{bold}{${color}-fg}Agent (${nextAgent.name}):{/${color}-fg}{/bold}`, 'system');
               configManager.propagateInstructions();
               const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
               if (retryResult.exitCode === 0) {
-                chatUI.addMessage(retryResult.stdout, 'agent');
+                chatUI.addMessage(retryResult.stdout, 'agent', nextAgent.name);
                 // Add agent response to history
                 historyManager.writeHistory({
                   sender: 'agent',
@@ -535,7 +541,7 @@ chatUI.getInputBox().on('submit', async (text) => {
             }
           }
         } else {
-          chatUI.addMessage(result.stdout, 'agent');
+          chatUI.addMessage(result.stdout, 'agent', agent.name);
           
           // Add agent response to history
           historyManager.writeHistory({
@@ -555,13 +561,16 @@ chatUI.getInputBox().on('submit', async (text) => {
           // Try next agent
           const nextAgent = agentManager.getNextAgent();
           if (nextAgent && nextAgent.name !== agent.name) {
-            chatUI.addMessage(`Agent (${nextAgent.name}):`, 'system');
+            const colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan'];
+            const colorIndex = nextAgent.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+            const color = colors[colorIndex];
+            chatUI.addMessage(`{bold}{${color}-fg}Agent (${nextAgent.name}):{/${color}-fg}{/bold}`, 'system');
             try {
               const history = historyManager.readHistory();
               configManager.propagateInstructions();
               const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
               if (retryResult.exitCode === 0) {
-                chatUI.addMessage(retryResult.stdout, 'agent');
+                chatUI.addMessage(retryResult.stdout, 'agent', nextAgent.name);
                 // Add agent response to history
                 historyManager.writeHistory({
                   sender: 'agent',
