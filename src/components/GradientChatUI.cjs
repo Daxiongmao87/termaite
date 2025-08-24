@@ -245,24 +245,16 @@ class GradientChatUI {
    * Add a message to the chat box
    * @param {string} message - The message to add
    * @param {string} sender - The sender of the message ('user', 'system', 'agent')
-   * @param {string} agentName - Optional agent name for color coding
    */
-  addMessage(message, sender, agentName = null) {
+  addMessage(message, sender) {
     let formattedMessage = '';
     switch (sender) {
       case 'user':
         formattedMessage = `{bold}You:{/bold} ${message}`;
         break;
       case 'agent':
-        // Generate a consistent color for each agent based on name
-        if (agentName) {
-          const colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan'];
-          const colorIndex = agentName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
-          const color = colors[colorIndex];
-          formattedMessage = `{bold}{${color}-fg}Agent (${agentName}):{/${color}-fg}{/bold} ${message}`;
-        } else {
-          formattedMessage = `{bold}Agent:{/bold} ${message}`;
-        }
+        // Agent messages are just the content - no prefix needed since we have the announcement
+        formattedMessage = message;
         break;
       case 'system':
       default:

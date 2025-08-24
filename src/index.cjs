@@ -526,7 +526,7 @@ chatUI.getInputBox().on('submit', async (text) => {
               configManager.propagateInstructions();
               const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
               if (retryResult.exitCode === 0) {
-                chatUI.addMessage(retryResult.stdout, 'agent', nextAgent.name);
+                chatUI.addMessage(retryResult.stdout, 'agent');
                 // Add agent response to history
                 historyManager.writeHistory({
                   sender: 'agent',
@@ -541,7 +541,7 @@ chatUI.getInputBox().on('submit', async (text) => {
             }
           }
         } else {
-          chatUI.addMessage(result.stdout, 'agent', agent.name);
+          chatUI.addMessage(result.stdout, 'agent');
           
           // Add agent response to history
           historyManager.writeHistory({
@@ -570,7 +570,7 @@ chatUI.getInputBox().on('submit', async (text) => {
               configManager.propagateInstructions();
               const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
               if (retryResult.exitCode === 0) {
-                chatUI.addMessage(retryResult.stdout, 'agent', nextAgent.name);
+                chatUI.addMessage(retryResult.stdout, 'agent');
                 // Add agent response to history
                 historyManager.writeHistory({
                   sender: 'agent',
