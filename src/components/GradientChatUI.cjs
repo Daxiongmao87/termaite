@@ -6,11 +6,18 @@ class GradientChatUI {
     // Store history manager reference
     this.historyManager = historyManager || null;
     
-    // Create a screen object.
+    // Create a screen object with enhanced color support
     this.screen = blessed.screen({
       smartCSR: true,
       title: 'TERMAITE',
-      mouse: true  // Enable mouse support for scrolling
+      mouse: true,  // Enable mouse support for scrolling
+      warnings: false,
+      // Enable 256-color mode if supported
+      colors: process.env.TERM && (
+        process.env.TERM.includes('256') || 
+        process.env.TERM.includes('color') ||
+        process.env.COLORTERM === 'truecolor'
+      ) ? 256 : 16
     });
 
     // Track raw messages with tags for proper rendering
@@ -46,7 +53,7 @@ class GradientChatUI {
         fg: 'white',
         bg: 'black',
         border: {
-          fg: this.gradientColors[this.gradientColors.length - 1] // Cyan border
+          fg: 'cyan' // Cyan border - named color for blessed.js compatibility
         }
       }
     });
@@ -112,7 +119,7 @@ class GradientChatUI {
         fg: 'white',
         bg: 'black',
         border: {
-          fg: '#808080' // Gray border for input
+          fg: 'gray' // Gray border for input - named color for blessed.js compatibility
         }
       }
     });

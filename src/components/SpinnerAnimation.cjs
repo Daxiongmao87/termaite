@@ -8,15 +8,16 @@ class SpinnerAnimation {
     this.spinnerFrames = ['◜ ', ' ◝', ' ◞', '◟ '];
     this.currentFrame = 0;
     
-    // Color palette for random selection
+    // Color palette for random selection - using hex colors for better terminal compatibility
     this.colors = [
-      'red',
-      'green', 
-      'yellow',
-      'blue',
-      'magenta',
-      'cyan',
-      'white'
+      '#FF6B6B', // Bright red
+      '#4ECDC4', // Bright teal
+      '#45B7D1', // Bright blue
+      '#96CEB4', // Mint green
+      '#FFEAA7', // Bright yellow
+      '#DDA0DD', // Plum
+      '#BB8FCE', // Light purple
+      '#85C1E9'  // Sky blue
     ];
     
     this.currentColor = this.getRandomColor();
