@@ -629,12 +629,8 @@ class WebServer {
       return;
     }
     
-    // Add user message to history
-    this.historyManager.writeHistory({
-      sender: 'user',
-      text: text,
-      timestamp: new Date().toISOString()
-    });
+    // Add user message to history and user inputs (for arrow navigation)
+    this.historyManager.writeUserInput(text);
     
     // Get the next agent
     const agent = this.agentManager.getNextAgent();
@@ -716,6 +712,9 @@ class WebServer {
    * Handle slash commands (adapted from TUI version)
    */
   async handleSlashCommand(clientId, command) {
+    // Save slash command to user inputs for arrow navigation  
+    this.historyManager.appendToUserInputsFile(command);
+    
     const cmd = command.substring(1).split(' ')[0];
     const args = command.substring(1).split(' ').slice(1);
     
