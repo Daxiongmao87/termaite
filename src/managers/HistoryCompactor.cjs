@@ -64,7 +64,7 @@ class HistoryCompactor {
     
     // Request a summary from the agent
     try {
-      const result = await AgentWrapper.executeAgentCommand(agent, `Please summarize the following chat history:\n\n${historyString}`, [], this.globalTimeout);
+      const result = await AgentWrapper.executeAgentCommand(agent, `Please summarize the following chat history as a concise bullet-point list of critical details:\n\n${historyString}`, [], this.globalTimeout);
       
       // Create a new entry for the summary
       const summaryEntry = {

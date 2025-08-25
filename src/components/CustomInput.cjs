@@ -259,17 +259,14 @@ class CustomInput {
   }
   
   /**
-   * Load user messages from history
+   * Load user messages from dedicated user inputs file
    */
   loadUserMessages() {
     if (!this.historyManager) return;
     
     try {
-      const history = this.historyManager.readHistory();
-      // Filter for user messages only and extract text
-      this.userMessages = history
-        .filter(entry => entry.sender === 'user')
-        .map(entry => entry.text);
+      // Use dedicated user inputs file instead of chat history
+      this.userMessages = this.historyManager.readUserInputs();
     } catch (error) {
       // Silently fail if history can't be loaded
       this.userMessages = [];

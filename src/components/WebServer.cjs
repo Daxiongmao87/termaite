@@ -703,7 +703,8 @@ class WebServer {
           '/select <agent> - Select agent for next prompt',
           '/strategy [mode] - Show or set rotation strategy',
           '/agents - Show agent status',
-          '/config - Show configuration info'
+          '/config - Show configuration info',
+          '/sh <command> - Execute shell command'
         ].join('\n');
         
         this.sendWebSocketMessage(clientId, {
@@ -732,6 +733,114 @@ class WebServer {
           type: 'system',
           message: `Current working directory: ${this.currentWorkingPath}\nConfig file: ${this.configManager.configPath}`
         });
+        break;
+        
+      case 'sh':
+        if (args.length === 0) {
+          this.sendWebSocketMessage(clientId, {
+            type: 'error',
+            message: 'Usage: /sh <command>'
+          });
+          break;
+        }
+        
+        const shellCommand = args.join(' ');
+        
+        // Send command being executed
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: `$ ${shellCommand}`
+        });
+        
+        // Execute shell command
+        try {
+          const { spawn } = require('child_process');
+          const process = spawn(shellCommand, { shell: true, cwd: this.currentWorkingPath });
+          
+          let stdout = '';
+          let stderr = '';
+          
+          process.stdout.on('data', (data) => {
+            stdout += data.toString();
+          });
+          
+          process.stderr.on('data', (data) => {
+            stderr += data.toString();
+          });
+          
+          process.on('close', (exitCode) => {
+            // Display output
+            if (stdout.trim()) {
+              // Limit output size to prevent UI issues
+              const maxOutputSize = 10000;
+              const displayOutput = stdout.length > maxOutputSize 
+                ? stdout.substring(0, maxOutputSize) + '\n... (output truncated)'
+                : stdout.trim();
+              this.sendWebSocketMessage(clientId, {
+                type: 'system',
+                message: displayOutput
+              });
+            }
+            
+            if (stderr.trim()) {
+              const maxOutputSize = 10000;
+              const displayError = stderr.length > maxOutputSize 
+                ? stderr.substring(0, maxOutputSize) + '\n... (error output truncated)'
+                : stderr.trim();
+              this.sendWebSocketMessage(clientId, {
+                type: 'error',
+                message: displayError
+              });
+            }
+            
+            // Show exit code if non-zero
+            if (exitCode !== 0) {
+              this.sendWebSocketMessage(clientId, {
+                type: 'error',
+                message: `(Exit code: ${exitCode})`
+              });
+            }
+            
+            // Add to history
+            const commandOutput = `$ ${shellCommand}\n${stdout}${stderr ? stderr : ''}${exitCode !== 0 ? `(Exit code: ${exitCode})` : ''}`;
+            this.historyManager.writeHistory({
+              sender: 'shell',
+              text: commandOutput,
+              timestamp: new Date().toISOString()
+            });
+          });
+          
+          process.on('error', (error) => {
+            this.sendWebSocketMessage(clientId, {
+              type: 'error',
+              message: `Command error: ${error.message}`
+            });
+            
+            // Add error to history
+            this.historyManager.writeHistory({
+              sender: 'shell',
+              text: `$ ${shellCommand}\nError: ${error.message}`,
+              timestamp: new Date().toISOString()
+            });
+          });
+          
+          // Set timeout (30 seconds)
+          setTimeout(() => {
+            if (!process.killed) {
+              process.kill('SIGTERM');
+              this.sendWebSocketMessage(clientId, {
+                type: 'error',
+                message: 'Command timed out after 30 seconds'
+              });
+            }
+          }, 30000);
+          
+        } catch (error) {
+          this.sendWebSocketMessage(clientId, {
+            type: 'error',
+            message: `Failed to execute command: ${error.message}`
+          });
+        }
         break;
         
       default:
@@ -1398,6 +1507,7 @@ input:focus {
         switch (data.type) {
             case 'system':
                 this.addMessage(data.message, 'system');
+                this.setInputEnabled(true);
                 break;
                 
             case 'agent':

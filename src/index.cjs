@@ -251,6 +251,10 @@ const historyManager = new HistoryManager(projectPath);
 // If we loaded history from --continue, replace current history with it
 if (argv.continue && loadedHistory.length > 0) {
   historyManager.replaceHistory(loadedHistory);
+} else if (!argv.continue) {
+  // If not continuing, start with fresh history (clear any existing history)
+  historyManager.clearHistory();
+  historyManager.clearUserInputs();
 }
 
 // Create the agent manager with rotation strategy override if provided
@@ -295,6 +299,8 @@ if (argv.continue && loadedHistory.length > 0) {
       historyContent += `${entry.text}\n`;
     } else if (entry.sender === 'system') {
       historyContent += `${entry.text}\n`;
+    } else if (entry.sender === 'shell') {
+      historyContent += `{green-fg}${entry.text}{/green-fg}\n`;
     }
   });
   
@@ -343,6 +349,7 @@ async function handleSlashCommand(text) {
       chatUI.addMessage('/init - Initialize the project', 'system');
       chatUI.addMessage('/config - Open the configuration file', 'system');
       chatUI.addMessage('/instructions - Edit global agent instructions', 'system');
+      chatUI.addMessage('/sh <command> - Execute shell command', 'system');
       break;
       
     case 'compact':
@@ -545,6 +552,104 @@ async function handleSlashCommand(text) {
       });
       break;
       
+    case 'sh':
+      if (args.length === 0) {
+        chatUI.addMessage('Usage: /sh <command>', 'system');
+        break;
+      }
+      
+      const shellCommand = args.join(' ');
+      chatUI.addMessage(`{gray-fg}$ ${shellCommand}{/gray-fg}`, 'system');
+      chatUI.getScreen().render();
+      
+      // Execute shell command
+      try {
+        const { spawn } = require('child_process');
+        const process = spawn(shellCommand, { shell: true, cwd: historyManager.projectPath });
+        
+        let stdout = '';
+        let stderr = '';
+        
+        // Start spinner
+        spinnerAnimation.start();
+        
+        process.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+        
+        process.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+        
+        process.on('close', (exitCode) => {
+          spinnerAnimation.stop();
+          
+          // Display output
+          if (stdout.trim()) {
+            // Limit output size to prevent UI issues
+            const maxOutputSize = 10000;
+            const displayOutput = stdout.length > maxOutputSize 
+              ? stdout.substring(0, maxOutputSize) + '\n... (output truncated)'
+              : stdout.trim();
+            chatUI.addMessage(displayOutput, 'system');
+          }
+          
+          if (stderr.trim()) {
+            const maxOutputSize = 10000;
+            const displayError = stderr.length > maxOutputSize 
+              ? stderr.substring(0, maxOutputSize) + '\n... (error output truncated)'
+              : stderr.trim();
+            chatUI.addMessage(`{red-fg}${displayError}{/red-fg}`, 'system');
+          }
+          
+          // Show exit code if non-zero
+          if (exitCode !== 0) {
+            chatUI.addMessage(`{red-fg}(Exit code: ${exitCode}){/red-fg}`, 'system');
+          }
+          
+          // Add to history
+          const commandOutput = `$ ${shellCommand}\n${stdout}${stderr ? stderr : ''}${exitCode !== 0 ? `(Exit code: ${exitCode})` : ''}`;
+          historyManager.writeHistory({
+            sender: 'shell',
+            text: commandOutput,
+            timestamp: new Date().toISOString()
+          });
+          
+          chatUI.getInputBox().focus();
+          chatUI.getScreen().render();
+        });
+        
+        process.on('error', (error) => {
+          spinnerAnimation.stop();
+          chatUI.addMessage(`{red-fg}Command error: ${error.message}{/red-fg}`, 'system');
+          
+          // Add error to history
+          historyManager.writeHistory({
+            sender: 'shell',
+            text: `$ ${shellCommand}\nError: ${error.message}`,
+            timestamp: new Date().toISOString()
+          });
+          
+          chatUI.getInputBox().focus();
+          chatUI.getScreen().render();
+        });
+        
+        // Set timeout (30 seconds)
+        setTimeout(() => {
+          if (!process.killed) {
+            process.kill('SIGTERM');
+            spinnerAnimation.stop();
+            chatUI.addMessage(`{yellow-fg}Command timed out after 30 seconds{/yellow-fg}`, 'system');
+            chatUI.getInputBox().focus();
+            chatUI.getScreen().render();
+          }
+        }, 30000);
+        
+      } catch (error) {
+        chatUI.addMessage(`{red-fg}Failed to execute command: ${error.message}{/red-fg}`, 'system');
+      }
+      break;
+      
     default:
       chatUI.addMessage(`Unknown command: ${command}`, 'system');
       chatUI.addMessage('Available commands:', 'system');
@@ -558,6 +663,7 @@ async function handleSlashCommand(text) {
       chatUI.addMessage('/init - Initialize the project', 'system');
       chatUI.addMessage('/config - Open the configuration file', 'system');
       chatUI.addMessage('/instructions - Edit global agent instructions', 'system');
+      chatUI.addMessage('/sh <command> - Execute shell command', 'system');
   }
 }
 
@@ -616,7 +722,16 @@ chatUI.getInputBox().on('submit', async (text) => {
   if (text) {
     // Handle slash commands
     if (text.startsWith('/')) {
-      // Add command to chat UI and both history files
+      const command = text.substring(1).split(' ')[0];
+      
+      // Special handling for /exit - only log for arrow navigation, don't show in chat
+      if (command === 'exit') {
+        historyManager.appendToUserInputsFile(text); // For arrow navigation only
+        await handleSlashCommand(text);
+        return;
+      }
+      
+      // For all other slash commands, add to both chat UI and history files
       chatUI.addMessage(text, 'user');
       historyManager.appendToUserInputsFile(text); // For arrow navigation
       historyManager.writeHistory({

@@ -8,6 +8,7 @@ class HistoryManager {
     this.projectPath = projectPath;
     this.projectSlug = this.createProjectSlug(projectPath);
     this.historyPath = this.getHistoryPath();
+    this.userInputsPath = this.getUserInputsPath();
     this.ensureHistoryDirExists();
   }
 
@@ -30,6 +31,14 @@ class HistoryManager {
    */
   getHistoryPath() {
     return path.join(os.homedir(), '.termaite', 'projects', this.projectSlug, 'history.jsonl');
+  }
+
+  /**
+   * Get the path to the user inputs file for the current project
+   * @returns {string} The path to the user inputs file
+   */
+  getUserInputsPath() {
+    return path.join(os.homedir(), '.termaite', 'projects', this.projectSlug, 'user_inputs.jsonl');
   }
 
   /**
@@ -113,12 +122,17 @@ class HistoryManager {
     }
 
     try {
-      const projects = fs.readdirSync(projectsDir);
+      const projects = fs.readdirSync(projectsDir, { withFileTypes: true });
       let mostRecent = null;
       let mostRecentTime = 0;
 
       for (const project of projects) {
-        const historyPath = path.join(projectsDir, project, 'history.jsonl');
+        // Only process directories
+        if (!project.isDirectory()) {
+          continue;
+        }
+        
+        const historyPath = path.join(projectsDir, project.name, 'history.jsonl');
         if (fs.existsSync(historyPath)) {
           const stats = fs.statSync(historyPath);
           if (stats.mtime.getTime() > mostRecentTime) {
@@ -169,6 +183,69 @@ class HistoryManager {
       history.forEach(entry => {
         this.writeHistory(entry);
       });
+    }
+  }
+
+  /**
+   * Write user input to both chat history and dedicated user inputs file
+   * @param {string} text - The user input text
+   */
+  writeUserInput(text) {
+    // Write to user inputs file for arrow navigation
+    this.appendToUserInputsFile(text);
+    
+    // Also write to main chat history for context
+    this.writeHistory({
+      sender: 'user',
+      text: text,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  /**
+   * Append text to user inputs file
+   * @param {string} text - The text to append
+   */
+  appendToUserInputsFile(text) {
+    try {
+      const entry = text + '\n';
+      fs.appendFileSync(this.userInputsPath, entry);
+    } catch (error) {
+      console.error('Error writing user input:', error);
+    }
+  }
+
+  /**
+   * Read user inputs from the user inputs file
+   * @returns {array} Array of user input strings
+   */
+  readUserInputs() {
+    try {
+      if (!fs.existsSync(this.userInputsPath)) {
+        return [];
+      }
+      
+      const content = fs.readFileSync(this.userInputsPath, 'utf8');
+      return content
+        .split('\n')
+        .filter(line => line.trim() !== '')
+        .map(line => line.trim());
+    } catch (error) {
+      console.error('Error reading user inputs:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Clear user inputs file
+   */
+  clearUserInputs() {
+    try {
+      if (fs.existsSync(this.userInputsPath)) {
+        fs.unlinkSync(this.userInputsPath);
+      }
+    } catch (error) {
+      console.error('Error clearing user inputs:', error);
     }
   }
 }
