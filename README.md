@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="./termaite.jpg" alt="TERMAITE" width="800">
+# TERMAITE
 
 **Multi-Agent AI CLI Orchestrator**
 
@@ -8,7 +8,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Node.js Version](https://img.shields.io/node/v/termaite.svg)](https://nodejs.org)
 
-[Installation](#-installation) • [Quick Start](#-quick-start) • [Features](#-features) • [Documentation](#-documentation) • [Contributing](#contributing)
+[Installation](#-installation) • [Quick Start](#-quick-start) • [Features](#-features) • [Configuration](#-configuration) • [Contributing](#contributing)
 
 </div>
 
@@ -20,10 +20,6 @@
 
 TERMAITE orchestrates multiple AI CLI agents into a unified interface with intelligent rotation and automatic failover. Never lose a conversation due to rate limits or service outages again.
 
-<div align="center">
-  <img src="https://github.com/Daxiongmao87/termaite/assets/demo.gif" alt="TERMAITE in action" width="800">
-  <p><em>Beautiful gradient UI with seamless agent switching</em></p>
-</div>
 
 ## 🚀 Installation
 
@@ -99,12 +95,6 @@ result=$(termaite --prompt "Generate a secure random password")
 - Automatic history compaction at 75% context limit
 - Continue conversations across sessions with `-c`
 
-### 🎨 **Beautiful Terminal UI**
-- Gradient-styled borders and ASCII art
-- Real-time pipe animation during agent processing
-- PageUp/PageDown navigation with mouse scroll support
-- Rich text formatting (bold, colors, etc.)
-
 ### ⚡ **Smart Context Management**
 - Automatic token counting and estimation
 - Intelligent history summarization
@@ -115,23 +105,31 @@ result=$(termaite --prompt "Generate a secure random password")
 ### Command Line Flags
 ```bash
 Options:
-  -c, --continue     Load most recent conversation
-  -a, --agent        Start with specific agent
-  -r, --rotation     Set rotation strategy (exhaustion|round-robin|random)  
-  -p, --prompt       Non-interactive mode with single prompt
-  -h, --help         Show help
-  -v, --version      Show version
+      --help      Show help                                            [boolean]
+      --version   Show version number                                  [boolean]
+  -c, --continue  Automatically loads the chat history from the most recently
+                  used project                                         [boolean]
+  -a, --agent     Overrides the default rotation for the first turn, starting
+                  with the specified agent name                         [string]
+  -r, --rotation  Overrides the rotationStrategy from settings.json for the
+                  current session                                       [string]
+  -p, --prompt    Enables non-interactive mode. The application will execute a
+                  single prompt with the chosen agent, print the result to
+                  stdout, and then exit                                 [string]
 ```
 
 ### Slash Commands (Interactive Mode)
 ```bash
-/help       Show available commands
-/clear      Clear chat history
-/config     Edit settings in $EDITOR
-/init       Analyze and document current project
-/compact    Manually trigger history compaction
-/switch     Switch to specific agent
-/exit       Exit application
+/help           Show available commands
+/clear          Clear chat history
+/config         Edit settings in $EDITOR
+/init           Analyze and document current project
+/compact        Manually trigger history compaction
+/select         Switch to specific agent
+/strategy       Change rotation strategy
+/agents         List available agents
+/instructions   View/edit agent instructions
+/exit           Exit application
 ```
 
 ## ⚙️ Configuration
@@ -249,35 +247,6 @@ Agents enter cooldown after failures:
 ### Token Management
 Automatic compaction triggers at 75% of the smallest agent's context window. Manual compaction available via `/compact`.
 
-## 🐛 Troubleshooting
-
-### No Agents Available
-```bash
-# Check installed agents
-which claude gemini qwen
-
-# Verify commands work
-echo "test" | claude --print --dangerously-skip-permissions
-
-# Update settings.json with correct paths
-termaite
-> /config
-```
-
-### Agent Timeouts
-```json
-{
-  "name": "slow-agent",
-  "command": "...",
-  "timeoutSeconds": 600  // Increase timeout
-  // Or use 0 for no timeout
-}
-```
-
-### Display Issues
-- Requires Unicode and 256-color terminal support
-- Recommended: iTerm2, Windows Terminal, or modern Linux terminals
-- Minimum terminal size: 80x24
 
 ## 🤝 Contributing
 
