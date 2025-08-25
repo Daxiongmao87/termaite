@@ -8,33 +8,46 @@ class AgentManager {
     this.agents = configManager.getAgents();
     this.rotationStrategy = configManager.getRotationStrategy();
     this.statePath = path.join(os.homedir(), '.termaite', 'state.json');
-    this.currentAgentIndex = this.loadState();
+    const state = this.loadState();
+    this.currentAgentIndex = state.currentAgentIndex;
+    this.selectedAgent = state.selectedAgent; // For manual mode
+    this.temporaryAgent = null; // For one-time selection overrides
     this.failedAgents = new Map(); // Map to track failed agents and their cooldown periods
   }
   
   /**
-   * Load the current agent index from state file
-   * @returns {number} The current agent index
+   * Load the state from state file
+   * @returns {object} The state object
    */
   loadState() {
     try {
       if (fs.existsSync(this.statePath)) {
         const state = JSON.parse(fs.readFileSync(this.statePath, 'utf8'));
-        return state.currentAgentIndex || 0;
+        return {
+          currentAgentIndex: state.currentAgentIndex || 0,
+          selectedAgent: state.selectedAgent || null,
+          strategy: state.strategy || this.rotationStrategy
+        };
       }
     } catch (error) {
       // Ignore errors, return default
     }
-    return 0;
+    return {
+      currentAgentIndex: 0,
+      selectedAgent: null,
+      strategy: this.rotationStrategy
+    };
   }
   
   /**
-   * Save the current agent index to state file
+   * Save the state to state file
    */
   saveState() {
     try {
       const state = {
-        currentAgentIndex: this.currentAgentIndex
+        currentAgentIndex: this.currentAgentIndex,
+        selectedAgent: this.selectedAgent,
+        strategy: this.rotationStrategy
       };
       fs.writeFileSync(this.statePath, JSON.stringify(state, null, 2));
     } catch (error) {
@@ -49,6 +62,16 @@ class AgentManager {
   getNextAgent() {
     if (this.agents.length === 0) {
       return null;
+    }
+
+    // Check for temporary agent selection first (one-time override)
+    if (this.temporaryAgent) {
+      const tempAgent = this.agents.find(agent => agent.name === this.temporaryAgent);
+      this.temporaryAgent = null; // Clear after use
+      if (tempAgent && !this.isAgentInCooldown(tempAgent.name)) {
+        return tempAgent;
+      }
+      // If temporary agent is in cooldown, fall through to normal logic
     }
 
     // Filter out agents that are currently in cooldown
@@ -67,6 +90,8 @@ class AgentManager {
         return this.getNextAgentExhaustion(availableAgents);
       case 'random':
         return this.getNextAgentRandom(availableAgents);
+      case 'manual':
+        return this.getNextAgentManual(availableAgents);
       default:
         // Default to round-robin if an unknown strategy is specified
         return this.getNextAgentRoundRobin(availableAgents);
@@ -133,6 +158,25 @@ class AgentManager {
   }
 
   /**
+   * Get the next agent using the manual strategy
+   * @param {array} availableAgents - The list of available agents
+   * @returns {object} The next agent
+   */
+  getNextAgentManual(availableAgents) {
+    // Manual strategy: Use the selected agent if available, otherwise first available
+    if (this.selectedAgent) {
+      const selectedAgent = availableAgents.find(agent => agent.name === this.selectedAgent);
+      if (selectedAgent) {
+        return selectedAgent;
+      }
+      // If selected agent is in cooldown, fall back to first available
+    }
+    
+    // No selected agent or selected agent unavailable, use first available
+    return availableAgents[0];
+  }
+
+  /**
    * Mark an agent as failed
    * @param {string} agentName - The name of the agent that failed
    * @param {number} consecutiveFailures - The number of consecutive failures
@@ -180,9 +224,79 @@ class AgentManager {
    * @param {string} strategy - The new rotation strategy
    */
   updateRotationStrategy(strategy) {
-    if (['round-robin', 'exhaustion', 'random'].includes(strategy)) {
+    if (['round-robin', 'exhaustion', 'random', 'manual'].includes(strategy)) {
       this.rotationStrategy = strategy;
+      this.saveState();
     }
+  }
+
+  /**
+   * Select an agent for manual mode or temporary override
+   * @param {string} agentName - The name of the agent to select
+   * @param {boolean} temporary - Whether this is a temporary selection (default: false)
+   * @returns {boolean} True if agent was found and selected
+   */
+  selectAgent(agentName, temporary = false) {
+    const agent = this.agents.find(a => a.name === agentName);
+    if (!agent) {
+      return false;
+    }
+
+    if (temporary) {
+      this.temporaryAgent = agentName;
+    } else {
+      this.selectedAgent = agentName;
+      this.saveState();
+    }
+    
+    return true;
+  }
+
+  /**
+   * Set the rotation strategy
+   * @param {string} strategy - The new rotation strategy
+   * @returns {boolean} True if strategy was valid and set
+   */
+  setStrategy(strategy) {
+    if (['round-robin', 'exhaustion', 'random', 'manual'].includes(strategy)) {
+      this.rotationStrategy = strategy;
+      this.saveState();
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Get the current rotation strategy
+   * @returns {string} The current rotation strategy
+   */
+  getStrategy() {
+    return this.rotationStrategy;
+  }
+
+  /**
+   * Get the currently selected agent (for manual mode)
+   * @returns {string|null} The selected agent name or null
+   */
+  getSelectedAgent() {
+    return this.selectedAgent;
+  }
+
+  /**
+   * Get agent status information
+   * @returns {object} Status information for all agents
+   */
+  getAgentStatus() {
+    return {
+      strategy: this.rotationStrategy,
+      selectedAgent: this.selectedAgent,
+      temporaryAgent: this.temporaryAgent,
+      agents: this.agents.map(agent => ({
+        name: agent.name,
+        available: !this.isAgentInCooldown(agent.name),
+        cooldownUntil: this.failedAgents.get(agent.name)?.cooldownUntil || null
+      }))
+    };
   }
 
   /**

@@ -230,22 +230,34 @@ const chatUI = new GradientChatUI(historyManager);
 // Create the spinner animation
 const spinnerAnimation = new SpinnerAnimation(chatUI);
 
-// Display welcome message with ASCII art
-chatUI.displayWelcomeMessage();
-
-// If we loaded history with --continue, display it in the chat UI
+// Handle display based on whether we're continuing or starting fresh
 if (argv.continue && loadedHistory.length > 0) {
-  chatUI.addMessage('--- Previous conversation loaded ---', 'system');
+  // Build the full history content first
+  let historyContent = '';
+  
   loadedHistory.forEach(entry => {
     if (entry.sender === 'user') {
-      chatUI.addMessage(entry.text, 'user');
+      historyContent += `{bold}You:{/bold} ${entry.text}\n`;
     } else if (entry.sender === 'agent') {
-      chatUI.addMessage(entry.text, 'agent');
+      historyContent += `${entry.text}\n`;
     } else if (entry.sender === 'system') {
-      chatUI.addMessage(entry.text, 'system');
+      historyContent += `${entry.text}\n`;
     }
   });
-  chatUI.addMessage('--- Continue your conversation ---', 'system');
+  
+  // Set all content at once
+  chatUI.chatBox.setContent(historyContent);
+  chatUI.getScreen().render();
+  
+  // Also populate the message arrays for consistency
+  loadedHistory.forEach(entry => {
+    const formattedMessage = entry.sender === 'user' ? 
+      `{bold}You:{/bold} ${entry.text}` : entry.text;
+    chatUI.messagesBeforeSpinner.push(formattedMessage);
+  });
+} else {
+  // Display welcome message for new sessions
+  chatUI.displayWelcomeMessage();
 }
 
 // Function to handle slash commands
@@ -271,7 +283,9 @@ async function handleSlashCommand(text) {
       chatUI.addMessage('/exit - Exit the application', 'system');
       chatUI.addMessage('/help - Show this help message', 'system');
       chatUI.addMessage('/compact - Compact the chat history', 'system');
-      chatUI.addMessage('/switch <agent> - Switch to a specific agent', 'system');
+      chatUI.addMessage('/select <agent> - Select agent for next prompt (or permanently in manual mode)', 'system');
+      chatUI.addMessage('/strategy [mode] - Show or set rotation strategy (round-robin, exhaustion, random, manual)', 'system');
+      chatUI.addMessage('/agents - Show agent status and current configuration', 'system');
       chatUI.addMessage('/init - Initialize the project', 'system');
       chatUI.addMessage('/config - Open the configuration file', 'system');
       chatUI.addMessage('/instructions - Edit global agent instructions', 'system');
@@ -296,20 +310,98 @@ async function handleSlashCommand(text) {
       }
       break;
       
-    case 'switch':
+    case 'select':
       if (args.length > 0) {
         const agentName = args[0];
         const agent = configManager.getAgents().find(a => a.name === agentName);
         if (agent) {
-          // For now, we'll just display a message that the switch is requested
-          // In a more advanced implementation, we might want to store this preference
-          chatUI.addMessage(`Switch requested to agent: ${agentName}`, 'system');
+          // Determine if this is temporary based on strategy
+          const isTemporary = agentManager.getStrategy() !== 'manual';
+          
+          if (agentManager.selectAgent(agentName, isTemporary)) {
+            if (isTemporary) {
+              chatUI.addMessage(`Selected ${agentName} for next prompt only`, 'system');
+            } else {
+              chatUI.addMessage(`Selected ${agentName} (manual mode)`, 'system');
+            }
+          } else {
+            chatUI.addMessage(`Agent not found: ${agentName}`, 'system');
+          }
         } else {
           chatUI.addMessage(`Agent not found: ${agentName}`, 'system');
         }
       } else {
-        chatUI.addMessage('Usage: /switch <agent_name>', 'system');
+        // Fall through to agents case when no argument provided
+        const status = agentManager.getAgentStatus();
+        
+        if (status.selectedAgent) {
+          const selectedColor = getAgentColor(status.selectedAgent);
+          chatUI.addMessage(`Selected agent: {bold}{${selectedColor}-fg}${status.selectedAgent}{/${selectedColor}-fg}{/bold}`, 'system');
+        }
+        
+        if (status.temporaryAgent) {
+          const tempColor = getAgentColor(status.temporaryAgent);
+          chatUI.addMessage(`Next prompt will use: {bold}{${tempColor}-fg}${status.temporaryAgent}{/${tempColor}-fg}{/bold}`, 'system');
+        }
+        
+        chatUI.addMessage('Agent status:', 'system');
+        const agents = configManager.getAgents();
+        status.agents.forEach(agentStatus => {
+          const agent = agents.find(a => a.name === agentStatus.name);
+          const color = getAgentColor(agentStatus.name);
+          const statusText = agentStatus.available ? 'available' : 'cooldown';
+          const contextWindow = agent ? agent.contextWindowTokens.toLocaleString() : 'unknown';
+          chatUI.addMessage(`- {bold}{${color}-fg}${agentStatus.name}{/${color}-fg}{/bold}`, 'system');
+          chatUI.addMessage(`    status:         ${statusText}`, 'system');
+          chatUI.addMessage(`    context window: ${contextWindow}`, 'system');
+        });
       }
+      break;
+      
+    case 'strategy':
+      if (args.length > 0) {
+        const strategy = args[0];
+        if (agentManager.setStrategy(strategy)) {
+          chatUI.addMessage(`Rotation strategy set to: ${strategy}`, 'system');
+        } else {
+          chatUI.addMessage(`Invalid strategy: ${strategy}`, 'system');
+          chatUI.addMessage('Available strategies: round-robin, exhaustion, random, manual', 'system');
+        }
+      } else {
+        const currentStrategy = agentManager.getStrategy();
+        chatUI.addMessage(`Current strategy: ${currentStrategy}`, 'system');
+        chatUI.addMessage('Available strategies:', 'system');
+        chatUI.addMessage('  round-robin - Rotate through agents in order', 'system');
+        chatUI.addMessage('  exhaustion - Always try agents in priority order (list order)', 'system');
+        chatUI.addMessage('  random - Pick agents randomly', 'system');
+        chatUI.addMessage('  manual - Use selected agent only, no rotation', 'system');
+      }
+      break;
+      
+    case 'agents':
+      const status = agentManager.getAgentStatus();
+      
+      if (status.selectedAgent) {
+        const selectedColor = getAgentColor(status.selectedAgent);
+        chatUI.addMessage(`Selected agent: {bold}{${selectedColor}-fg}${status.selectedAgent}{/${selectedColor}-fg}{/bold}`, 'system');
+      }
+      
+      if (status.temporaryAgent) {
+        const tempColor = getAgentColor(status.temporaryAgent);
+        chatUI.addMessage(`Next prompt will use: {bold}{${tempColor}-fg}${status.temporaryAgent}{/${tempColor}-fg}{/bold}`, 'system');
+      }
+      
+      chatUI.addMessage('Agent status:', 'system');
+      const agents = configManager.getAgents();
+      status.agents.forEach(agentStatus => {
+        const agent = agents.find(a => a.name === agentStatus.name);
+        const color = getAgentColor(agentStatus.name);
+        const statusText = agentStatus.available ? 'available' : 'cooldown';
+        const contextWindow = agent ? agent.contextWindowTokens.toLocaleString() : 'unknown';
+        chatUI.addMessage(`- {bold}{${color}-fg}${agentStatus.name}{/${color}-fg}{/bold}`, 'system');
+        chatUI.addMessage(`    status:         ${statusText}`, 'system');
+        chatUI.addMessage(`    context window: ${contextWindow}`, 'system');
+      });
       break;
       
     case 'init':
@@ -401,7 +493,25 @@ async function handleSlashCommand(text) {
       
     default:
       chatUI.addMessage(`Unknown command: ${command}`, 'system');
+      chatUI.addMessage('Available commands:', 'system');
+      chatUI.addMessage('/clear - Clear the chat history', 'system');
+      chatUI.addMessage('/exit - Exit the application', 'system');
+      chatUI.addMessage('/help - Show this help message', 'system');
+      chatUI.addMessage('/compact - Compact the chat history', 'system');
+      chatUI.addMessage('/select <agent> - Select agent for next prompt (or permanently in manual mode)', 'system');
+      chatUI.addMessage('/strategy [mode] - Show or set rotation strategy (round-robin, exhaustion, random, manual)', 'system');
+      chatUI.addMessage('/agents - Show agent status and current configuration', 'system');
+      chatUI.addMessage('/init - Initialize the project', 'system');
+      chatUI.addMessage('/config - Open the configuration file', 'system');
+      chatUI.addMessage('/instructions - Edit global agent instructions', 'system');
   }
+}
+
+// Helper function to get agent color
+function getAgentColor(agentName) {
+  const colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan'];
+  const colorIndex = agentName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+  return colors[colorIndex];
 }
 
 // Track if we need to use a specific agent for the first interaction
@@ -429,6 +539,14 @@ chatUI.getInputBox().on('submit', async (text) => {
   if (text) {
     // Handle slash commands
     if (text.startsWith('/')) {
+      // Add command to chat UI and history
+      chatUI.addMessage(text, 'user');
+      historyManager.writeHistory({
+        sender: 'user',
+        text: text,
+        timestamp: new Date().toISOString()
+      });
+      
       await handleSlashCommand(text);
       chatUI.getInputBox().clearValue();
       chatUI.getInputBox().focus();
