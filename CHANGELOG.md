@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.3](https://github.com/Daxiongmao87/termaite/compare/v0.2.2...v0.2.3) (2025-08-25)
+
+
+### ✨ Features
+
+* add color-coded agent announcements ([33304ca](https://github.com/Daxiongmao87/termaite/commit/33304cad93aa166e1a994edf782da84dbe411ba3))
+* add global agent instructions feature ([5ec4157](https://github.com/Daxiongmao87/termaite/commit/5ec415756eda7a65b7575c5994cec769c2bfb477))
+* improve agent cancellation and UI ([8d53dc1](https://github.com/Daxiongmao87/termaite/commit/8d53dc1169a2caee451fd9ae22de476c9150a53f))
+
+
+### 🐛 Bug Fixes
+
+* **input:** prevent invisible char on submit ([bba5dfe](https://github.com/Daxiongmao87/termaite/commit/bba5dfef4654e8b7bf508e26b39f1d541b1dd378))
+* remove redundant agent name from responses ([efc5b74](https://github.com/Daxiongmao87/termaite/commit/efc5b741ed24f144ae0bc684f34a396c0c71c297))
+* update commit-msg hook with 75 char limit and attribution check ([dc5df02](https://github.com/Daxiongmao87/termaite/commit/dc5df02ae3edc96e737f3adb3a1e77ec46c83713))
+
 ### [0.2.2](https://github.com/Daxiongmao87/termaite/compare/v0.2.1...v0.2.2) (2025-08-23)
 
 ### [0.2.1](https://github.com/Daxiongmao87/termaite/compare/v0.2.0...v0.2.1) (2025-08-23)
