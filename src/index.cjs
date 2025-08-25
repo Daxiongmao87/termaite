@@ -1,7 +1,30 @@
 #!/usr/bin/env node
 
+// Ensure proper UTF-8 encoding and Unicode support
+process.env.LANG = process.env.LANG || 'en_US.UTF-8';
+process.env.LC_ALL = process.env.LC_ALL || 'en_US.UTF-8';
+
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
+
+// Pre-process --web argument to handle the optional value case
+let webArg = false;
+const processedArgs = [];
+const rawArgs = process.argv.slice(2);
+
+for (let i = 0; i < rawArgs.length; i++) {
+  if (rawArgs[i] === '--web' || rawArgs[i] === '-w') {
+    // Check if next argument exists and is not another flag
+    if (rawArgs[i + 1] && !rawArgs[i + 1].startsWith('-')) {
+      webArg = rawArgs[i + 1];
+      i++; // Skip the next argument as it's the web value
+    } else {
+      webArg = true;
+    }
+  } else {
+    processedArgs.push(rawArgs[i]);
+  }
+}
 const GradientChatUI = require('./components/GradientChatUI.cjs');
 const ConfigManager = require('./managers/ConfigManager.cjs');
 const HistoryManager = require('./managers/HistoryManager.cjs');
@@ -14,7 +37,7 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
-const argv = yargs(hideBin(process.argv))
+const argv = yargs(processedArgs)
   .option('continue', {
     alias: 'c',
     type: 'boolean',
@@ -36,6 +59,36 @@ const argv = yargs(hideBin(process.argv))
     description: 'Enables non-interactive mode. The application will execute a single prompt with the chosen agent, print the result to stdout, and then exit'
   })
   .argv;
+
+// If in web mode, start the web server
+if (webArg) {
+  const WebServer = require('./components/WebServer.cjs');
+  const webServer = new WebServer();
+  
+  // Parse host and port from the web argument
+  let host = '127.0.0.1';
+  let port = 7378;
+  
+  // If web argument has a value, parse it
+  if (webArg && webArg !== true && typeof webArg === 'string') {
+    if (webArg.includes(':')) {
+      [host, port] = webArg.split(':');
+      port = parseInt(port, 10);
+    } else {
+      port = parseInt(webArg, 10);
+    }
+  }
+  
+  // Validate port
+  if (isNaN(port) || port < 1 || port > 65535) {
+    console.error('Invalid port number. Please provide a valid port between 1 and 65535.');
+    process.exit(1);
+  }
+  
+  // Start the web server
+  webServer.start(host, port);
+  return;
+}
 
 // If in non-interactive mode, execute the prompt and exit
 if (argv.prompt) {
@@ -268,6 +321,7 @@ async function handleSlashCommand(text) {
   switch (command) {
     case 'clear':
       historyManager.clearHistory();
+      historyManager.clearUserInputs();
       chatUI.clearChat();
       chatUI.addMessage('History cleared', 'system');
       break;
@@ -507,10 +561,33 @@ async function handleSlashCommand(text) {
   }
 }
 
-// Helper function to get agent color
+// Helper function to get agent color with rich 256-color palette
 function getAgentColor(agentName) {
-  const colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan'];
-  const colorIndex = agentName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
+  // Rich 256-color palette for agents with good contrast and distinctiveness
+  const colors = [
+    // Bright primary colors
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD',
+    '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA',
+    // Vibrant secondary colors  
+    '#FF8A80', '#80CBC4', '#81C784', '#FFB74D', '#F06292', '#9575CD',
+    '#4FC3F7', '#AED581', '#FFD54F', '#A1887F', '#90A4AE', '#EF5350',
+    // Rich tertiary colors
+    '#26A69A', '#AB47BC', '#5C6BC0', '#42A5F5', '#66BB6A', '#FFCA28',
+    '#FF7043', '#8D6E63', '#78909C', '#EC407A', '#7E57C2', '#29B6F6',
+    // Additional vibrant options
+    '#FFAB91', '#C5E1A5', '#FFF176', '#BCAAA4', '#B0BEC5', '#FFCDD2',
+    '#E1BEE7', '#C8E6C9', '#FFF9C4', '#D7CCC8', '#CFD8DC', '#FFCCBC'
+  ];
+  
+  // Use a more sophisticated hash for better color distribution
+  let hash = 0;
+  for (let i = 0; i < agentName.length; i++) {
+    const char = agentName.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  
+  const colorIndex = Math.abs(hash) % colors.length;
   return colors[colorIndex];
 }
 
@@ -539,8 +616,9 @@ chatUI.getInputBox().on('submit', async (text) => {
   if (text) {
     // Handle slash commands
     if (text.startsWith('/')) {
-      // Add command to chat UI and history
+      // Add command to chat UI and both history files
       chatUI.addMessage(text, 'user');
+      historyManager.appendToUserInputsFile(text); // For arrow navigation
       historyManager.writeHistory({
         sender: 'user',
         text: text,
@@ -559,12 +637,8 @@ chatUI.getInputBox().on('submit', async (text) => {
     chatUI.getInputBox().focus();
     chatUI.getScreen().render();
     
-    // Add to history
-    historyManager.writeHistory({
-      sender: 'user',
-      text: text,
-      timestamp: new Date().toISOString()
-    });
+    // Add to both user inputs (for arrow navigation) and chat history (for context)
+    historyManager.writeUserInput(text);
     
     // Get the next agent (use override for first interaction if specified)
     let agent;
@@ -575,10 +649,8 @@ chatUI.getInputBox().on('submit', async (text) => {
       agent = agentManager.getNextAgent();
     }
     if (agent) {
-      // Show which agent is being used with color coding
-      const colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan'];
-      const colorIndex = agent.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
-      const color = colors[colorIndex];
+      // Show which agent is being used with rich color coding
+      const color = getAgentColor(agent.name);
       chatUI.addMessage(`{bold}{${color}-fg}Agent (${agent.name}):{/${color}-fg}{/bold}`, 'system');
       
       // Track that we added 2 messages (user + agent announcement) for cancellation
@@ -637,9 +709,7 @@ chatUI.getInputBox().on('submit', async (text) => {
             // Try next agent
             const nextAgent = agentManager.getNextAgent();
             if (nextAgent && nextAgent.name !== agent.name) {
-              const colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan'];
-              const colorIndex = nextAgent.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
-              const color = colors[colorIndex];
+              const color = getAgentColor(nextAgent.name);
               chatUI.addMessage(`{bold}{${color}-fg}Agent (${nextAgent.name}):{/${color}-fg}{/bold}`, 'system');
               configManager.propagateInstructions();
               const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
@@ -679,9 +749,7 @@ chatUI.getInputBox().on('submit', async (text) => {
           // Try next agent
           const nextAgent = agentManager.getNextAgent();
           if (nextAgent && nextAgent.name !== agent.name) {
-            const colors = ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan'];
-            const colorIndex = nextAgent.name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
-            const color = colors[colorIndex];
+            const color = getAgentColor(nextAgent.name);
             chatUI.addMessage(`{bold}{${color}-fg}Agent (${nextAgent.name}):{/${color}-fg}{/bold}`, 'system');
             try {
               const history = historyManager.readHistory();
