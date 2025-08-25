@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.4](https://github.com/Daxiongmao87/termaite/compare/v0.2.3...v0.2.4) (2025-08-25)
+
+
+### ✨ Features
+
+* redesign agent selection system and fix -c flag ([92f350c](https://github.com/Daxiongmao87/termaite/commit/92f350cb275141a36a2f06d419886b2e2413945f))
+
 ### [0.2.3](https://github.com/Daxiongmao87/termaite/compare/v0.2.2...v0.2.3) (2025-08-25)
 
 
