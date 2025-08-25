@@ -104,6 +104,8 @@ class WebServer {
       this.handleAutocomplete(req, res);
     } else if (url.pathname === '/api/status') {
       this.handleStatusRequest(res);
+    } else if (url.pathname === '/api/history') {
+      this.handleHistoryRequest(res);
     } else {
       res.writeHead(404, { 'Content-Type': 'text/plain' });
       res.end('Not Found');
@@ -362,6 +364,20 @@ class WebServer {
       agentIsRunning: this.agentIsRunning
     }));
   }
+
+  /**
+   * Handle history requests
+   */
+  handleHistoryRequest(res) {
+    try {
+      const userInputs = this.historyManager.readUserInputs();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ userInputs }));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Failed to load history' }));
+    }
+  }
   
   /**
    * Handle WebSocket upgrade
@@ -471,6 +487,9 @@ class WebServer {
           break;
         case 'slash':
           this.handleSlashCommand(clientId, data.command);
+          break;
+        case 'cancel':
+          this.handleCancelRequest(clientId);
           break;
         default:
           this.sendWebSocketMessage(clientId, {
@@ -582,6 +601,22 @@ class WebServer {
     }
   }
   
+  /**
+   * Handle cancellation requests
+   */
+  handleCancelRequest(clientId) {
+    if (this.agentIsRunning) {
+      // Cancel the current agent command
+      if (AgentWrapper.cancelCurrentCommand()) {
+        this.agentIsRunning = false;
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: 'Agent cancelled by user'
+        });
+      }
+    }
+  }
+
   /**
    * Handle chat messages (same logic as TUI)
    */
@@ -748,7 +783,7 @@ class WebServer {
         
         // Send command being executed
         this.sendWebSocketMessage(clientId, {
-          type: 'system',
+          type: 'shell',
           message: `$ ${shellCommand}`
         });
         
@@ -777,7 +812,7 @@ class WebServer {
                 ? stdout.substring(0, maxOutputSize) + '\n... (output truncated)'
                 : stdout.trim();
               this.sendWebSocketMessage(clientId, {
-                type: 'system',
+                type: 'shell',
                 message: displayOutput
               });
             }
@@ -1131,6 +1166,10 @@ body {
     color: #00ff00;
     font-style: italic;
 }
+.message.shell {
+    color: #00ff00;
+    white-space: pre-wrap;
+}
 
 .message.error {
     color: #ff4444;
@@ -1139,6 +1178,14 @@ body {
 .message.agent-start {
     color: #00ffff;
     font-weight: bold;
+}
+.message.spinner-message {
+    color: #cccccc;
+}
+.spinner-text {
+    color: #888888;
+    font-style: italic;
+    font-size: 0.8rem;
 }
 
 /* Input form */
@@ -1353,12 +1400,170 @@ input:focus {
         this.currentPath = '';
         this.autocompleteTimeout = null;
         this.selectedSuggestionIndex = -1;
+        
+        // Spinner animation properties (matching TUI)
+        this.spinnerFrames = ['◜ ', ' ◝', ' ◞', '◟ '];
+        this.spinnerColors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', 
+            '#FFEAA7', '#DDA0DD', '#BB8FCE', '#85C1E9'
+        ];
+        this.currentSpinnerFrame = 0;
+        this.spinnerInterval = null;
+        this.spinnerElement = null;
+        this.currentSpinnerColor = this.getRandomSpinnerColor();
+        
+        // User input history for arrow key navigation
+        this.userInputHistory = [];
+        this.historyIndex = -1;
+        this.originalInput = '';
         this.suggestions = [];
         
         this.initializeElements();
         this.attachEventListeners();
         this.connectWebSocket();
         this.updateCurrentPath();
+        this.loadUserInputHistory();
+    }
+    
+    getRandomSpinnerColor() {
+        return this.spinnerColors[Math.floor(Math.random() * this.spinnerColors.length)];
+    }
+    
+    startSpinner() {
+        // Clear any existing spinner
+        this.stopSpinner();
+        
+        // Create spinner element
+        this.spinnerElement = document.createElement('div');
+        this.spinnerElement.className = 'message spinner-message';
+        this.spinnerElement.innerHTML = '<span class="spinner-frame"></span> <span class="spinner-text">Esc to cancel</span>';
+        
+        this.elements.chatMessages.appendChild(this.spinnerElement);
+        this.scrollToBottom();
+        
+        // Start animation
+        this.currentSpinnerFrame = 0;
+        this.currentSpinnerColor = this.getRandomSpinnerColor();
+        this.animateSpinner();
+    }
+    
+    animateSpinner() {
+        if (!this.spinnerElement) return;
+        
+        const frame = this.spinnerFrames[this.currentSpinnerFrame];
+        const spinnerFrame = this.spinnerElement.querySelector('.spinner-frame');
+        
+        if (spinnerFrame) {
+            spinnerFrame.textContent = frame;
+            spinnerFrame.style.color = this.currentSpinnerColor;
+            spinnerFrame.style.fontWeight = 'bold';
+        }
+        
+        // Move to next frame
+        this.currentSpinnerFrame = (this.currentSpinnerFrame + 1) % this.spinnerFrames.length;
+        
+        // Change color after full revolution
+        if (this.currentSpinnerFrame === 0) {
+            this.currentSpinnerColor = this.getRandomSpinnerColor();
+        }
+        
+        // Schedule next frame at 15fps (67ms)
+        this.spinnerInterval = setTimeout(() => this.animateSpinner(), 67);
+    }
+    
+    stopSpinner() {
+        if (this.spinnerInterval) {
+            clearTimeout(this.spinnerInterval);
+            this.spinnerInterval = null;
+        }
+        
+        if (this.spinnerElement) {
+            this.spinnerElement.remove();
+            this.spinnerElement = null;
+        }
+    }
+    
+    handleEscapeKey(e) {
+        // If input is focused and has content, clear it
+        if (e.target === this.elements.messageInput && this.elements.messageInput.value.trim()) {
+            this.elements.messageInput.value = '';
+            this.resetHistoryNavigation();
+            return;
+        }
+        
+        // If spinner is running, cancel the agent
+        if (this.spinnerElement) {
+            this.cancelCurrentAgent();
+        }
+    }
+    
+    cancelCurrentAgent() {
+        // Send cancellation request to server
+        if (this.isConnected && this.socket.readyState === WebSocket.OPEN) {
+            this.socket.send(JSON.stringify({ type: 'cancel' }));
+        }
+        
+        // Stop spinner and re-enable input
+        this.stopSpinner();
+        this.setInputEnabled(true);
+        this.addMessage('Cancelled by user', 'system');
+    }
+    
+    async loadUserInputHistory() {
+        try {
+            const response = await fetch('/api/history', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.userInputHistory = data.userInputs || [];
+            }
+        } catch (error) {
+            console.error('Error loading input history:', error);
+        }
+    }
+    
+    navigateHistoryUp() {
+        if (this.userInputHistory.length === 0) return;
+        
+        if (this.historyIndex === -1) {
+            // Starting navigation, save current input
+            this.originalInput = this.elements.messageInput.value;
+            this.historyIndex = 0;
+        } else if (this.historyIndex < this.userInputHistory.length - 1) {
+            // Move to older message
+            this.historyIndex++;
+        } else {
+            // Already at oldest message
+            return;
+        }
+        
+        // Load the message from history (reverse order - newest first)
+        const messageIndex = this.userInputHistory.length - 1 - this.historyIndex;
+        this.elements.messageInput.value = this.userInputHistory[messageIndex];
+    }
+    
+    navigateHistoryDown() {
+        if (this.historyIndex === -1) return; // Not navigating
+        
+        this.historyIndex--;
+        
+        if (this.historyIndex === -1) {
+            // Restore original input
+            this.elements.messageInput.value = this.originalInput;
+            this.originalInput = '';
+        } else {
+            // Load the message from history
+            const messageIndex = this.userInputHistory.length - 1 - this.historyIndex;
+            this.elements.messageInput.value = this.userInputHistory[messageIndex];
+        }
+    }
+    
+    resetHistoryNavigation() {
+        this.historyIndex = -1;
+        this.originalInput = '';
     }
     
     initializeElements() {
@@ -1383,6 +1588,19 @@ input:focus {
         this.elements.inputForm.addEventListener('submit', (e) => {
             e.preventDefault();
             this.sendMessage();
+        });
+        
+        // ESC key for cancellation (global listener)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.handleEscapeKey(e);
+            } else if (e.key === 'ArrowUp' && e.target === this.elements.messageInput) {
+                e.preventDefault();
+                this.navigateHistoryUp();
+            } else if (e.key === 'ArrowDown' && e.target === this.elements.messageInput) {
+                e.preventDefault();
+                this.navigateHistoryDown();
+            }
         });
         
         // Path setting
@@ -1511,16 +1729,18 @@ input:focus {
                 break;
                 
             case 'agent':
+                this.stopSpinner();
                 this.addMessage(data.message, 'agent');
                 this.setInputEnabled(true);
                 break;
                 
             case 'agent_start':
                 this.addMessage(data.message, 'agent-start');
-                this.updateAgentStatus(\`🤖 \${data.agent} is thinking...\`);
+                this.startSpinner();
                 break;
                 
             case 'error':
+                this.stopSpinner();
                 this.addMessage(data.message, 'error');
                 this.setInputEnabled(true);
                 this.updateAgentStatus('');
@@ -1541,23 +1761,37 @@ input:focus {
         const messageEl = document.createElement('div');
         messageEl.className = \`message \${type}\`;
         
-        // Handle different message types
+        // Handle different message types to match TUI formatting
         switch (type) {
             case 'user':
+                // Match TUI: {bold}You:{/bold} message
                 messageEl.innerHTML = \`<strong>You:</strong> \${this.escapeHtml(content)}\`;
                 break;
                 
             case 'agent':
+                // Match TUI: Just the content, no prefix
                 messageEl.textContent = content;
                 this.updateAgentStatus('');
                 break;
                 
             case 'agent-start':
+                // Match TUI: Agent announcement
                 messageEl.innerHTML = \`<strong>\${this.escapeHtml(content)}</strong>\`;
                 break;
                 
             case 'system':
-                messageEl.textContent = content;
+                // Match TUI: Pass through as-is
+                // Check if it's a shell command (starts with '$')
+                if (content.startsWith('$')) {
+                    messageEl.innerHTML = \`<span style="color: #00ff00">\${this.escapeHtml(content)}</span>\`;
+                } else {
+                    messageEl.textContent = content;
+                }
+                break;
+                
+            case 'shell':
+                // Green text for shell output (matching TUI {green-fg})
+                messageEl.innerHTML = \`<span style="color: #00ff00">\${this.escapeHtml(content)}</span>\`;
                 break;
                 
             case 'error':
