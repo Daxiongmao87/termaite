@@ -720,6 +720,13 @@ class WebServer {
     // Save slash command to user inputs for arrow navigation  
     this.historyManager.appendToUserInputsFile(command);
     
+    // Save slash command to main chat history to match TUI behavior
+    this.historyManager.writeHistory({
+      sender: 'user',
+      text: command,
+      timestamp: new Date().toISOString()
+    });
+    
     const cmd = command.substring(1).split(' ')[0];
     const args = command.substring(1).split(' ').slice(1);
     
@@ -734,36 +741,102 @@ class WebServer {
         break;
         
       case 'help':
-        const helpMessage = [
-          'Available commands:',
-          '/clear - Clear the chat history',
-          '/help - Show this help message',
-          '/compact - Compact the chat history',
-          '/select <agent> - Select agent for next prompt',
-          '/strategy [mode] - Show or set rotation strategy',
-          '/agents - Show agent status',
-          '/config - Show configuration info',
-          '/sh <command> - Execute shell command'
-        ].join('\n');
-        
+        // Send multiple separate messages to match TUI format
         this.sendWebSocketMessage(clientId, {
           type: 'system',
-          message: helpMessage
+          message: 'Available commands:'
+        });
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: '/clear - Clear the chat history'
+        });
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: '/help - Show this help message'
+        });
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: '/compact - Compact the chat history'
+        });
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: '/select <agent> - Select agent for next prompt (or permanently in manual mode)'
+        });
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: '/strategy [mode] - Show or set rotation strategy (round-robin, exhaustion, random, manual)'
+        });
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: '/agents - Show agent status and current configuration'
+        });
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: '/init - Initialize the project'
+        });
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: '/config - Open the configuration file'
+        });
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: '/instructions - Edit global agent instructions'
+        });
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: '/sh <command> - Execute shell command'
         });
         break;
         
       case 'agents':
         const status = this.agentManager.getAgentStatus();
-        let agentsInfo = 'Agent status:\n';
         
-        status.agents.forEach(agentStatus => {
-          const statusText = agentStatus.available ? 'available' : 'cooldown';
-          agentsInfo += `- ${agentStatus.name}: ${statusText}\n`;
-        });
+        // Show selected agent info first, matching TUI format
+        if (status.selectedAgent) {
+          const selectedColor = this.getAgentColor ? this.getAgentColor(status.selectedAgent) : '#ffffff';
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: `Selected agent: {bold}{${selectedColor}-fg}${status.selectedAgent}{/${selectedColor}-fg}{/bold}`
+          });
+        }
         
+        if (status.temporaryAgent) {
+          const tempColor = this.getAgentColor ? this.getAgentColor(status.temporaryAgent) : '#ffffff';
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: `Next prompt will use: {bold}{${tempColor}-fg}${status.temporaryAgent}{/${tempColor}-fg}{/bold}`
+          });
+        }
+        
+        // Agent status header
         this.sendWebSocketMessage(clientId, {
           type: 'system',
-          message: agentsInfo
+          message: 'Agent status:'
+        });
+        
+        // Individual agent details with colors and context windows
+        const agents = this.configManager.getAgents();
+        status.agents.forEach(agentStatus => {
+          const agent = agents.find(a => a.name === agentStatus.name);
+          const color = this.getAgentColor ? this.getAgentColor(agentStatus.name) : '#ffffff';
+          const statusText = agentStatus.available ? 'available' : 'cooldown';
+          const contextWindow = agent ? agent.contextWindowTokens.toLocaleString() : 'unknown';
+          
+          // Agent name with color
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: `- {bold}{${color}-fg}${agentStatus.name}{/${color}-fg}{/bold}`
+          });
+          // Status with indentation
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: `    status:         ${statusText}`
+          });
+          // Context window with indentation
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: `    context window: ${contextWindow}`
+          });
         });
         break;
         
@@ -785,10 +858,10 @@ class WebServer {
         
         const shellCommand = args.join(' ');
         
-        // Send command being executed
+        // Send command being executed with gray formatting like TUI
         this.sendWebSocketMessage(clientId, {
-          type: 'shell',
-          message: `$ ${shellCommand}`
+          type: 'system',
+          message: `{gray-fg}$ ${shellCommand}{/gray-fg}`
         });
         
         // Execute shell command
@@ -827,16 +900,16 @@ class WebServer {
                 ? stderr.substring(0, maxOutputSize) + '\n... (error output truncated)'
                 : stderr.trim();
               this.sendWebSocketMessage(clientId, {
-                type: 'error',
-                message: displayError
+                type: 'system',
+                message: `{red-fg}${displayError}{/red-fg}`
               });
             }
             
-            // Show exit code if non-zero
+            // Show exit code if non-zero, with red formatting like TUI
             if (exitCode !== 0) {
               this.sendWebSocketMessage(clientId, {
-                type: 'error',
-                message: `(Exit code: ${exitCode})`
+                type: 'system',
+                message: `{red-fg}(Exit code: ${exitCode}){/red-fg}`
               });
             }
             
@@ -880,6 +953,191 @@ class WebServer {
             message: `Failed to execute command: ${error.message}`
           });
         }
+        break;
+      
+      case 'compact':
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: 'Compacting history...'
+        });
+        
+        // Get the next agent for summarization
+        const agent = this.agentManager.getNextAgent();
+        if (agent) {
+          try {
+            await this.historyCompactor.manualCompactHistory(agent);
+            this.sendWebSocketMessage(clientId, {
+              type: 'system',
+              message: 'History compacted successfully'
+            });
+          } catch (error) {
+            this.sendWebSocketMessage(clientId, {
+              type: 'system',
+              message: `Error compacting history: ${error.message}`
+            });
+          }
+        } else {
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: 'No agents configured. Please add agents to ~/.termaite/settings.json'
+          });
+        }
+        break;
+        
+      case 'select':
+        if (args.length > 0) {
+          const agentName = args[0];
+          const agent = this.configManager.getAgents().find(a => a.name === agentName);
+          if (agent) {
+            // Determine if this is temporary based on strategy
+            const isTemporary = this.agentManager.getStrategy() !== 'manual';
+            
+            if (this.agentManager.selectAgent(agentName, isTemporary)) {
+              if (isTemporary) {
+                this.sendWebSocketMessage(clientId, {
+                  type: 'system',
+                  message: `Selected ${agentName} for next prompt only`
+                });
+              } else {
+                this.sendWebSocketMessage(clientId, {
+                  type: 'system',
+                  message: `Selected ${agentName} (manual mode)`
+                });
+              }
+            } else {
+              this.sendWebSocketMessage(clientId, {
+                type: 'system',
+                message: `Agent not found: ${agentName}`
+              });
+            }
+          } else {
+            this.sendWebSocketMessage(clientId, {
+              type: 'system',
+              message: `Agent not found: ${agentName}`
+            });
+          }
+        } else {
+          // Fall through to agents case when no argument provided
+          const status = this.agentManager.getAgentStatus();
+          
+          if (status.selectedAgent) {
+            const selectedColor = this.getAgentColor ? this.getAgentColor(status.selectedAgent) : '#ffffff';
+            this.sendWebSocketMessage(clientId, {
+              type: 'system',
+              message: `Selected agent: {bold}{${selectedColor}-fg}${status.selectedAgent}{/${selectedColor}-fg}{/bold}`
+            });
+          }
+          
+          if (status.temporaryAgent) {
+            const tempColor = this.getAgentColor ? this.getAgentColor(status.temporaryAgent) : '#ffffff';
+            this.sendWebSocketMessage(clientId, {
+              type: 'system',
+              message: `Next prompt will use: {bold}{${tempColor}-fg}${status.temporaryAgent}{/${tempColor}-fg}{/bold}`
+            });
+          }
+          
+          // CRITICAL: Always display agent status like TUI does
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: 'Agent status:'
+          });
+          
+          const agents = this.configManager.getAgents();
+          status.agents.forEach(agentStatus => {
+            const agent = agents.find(a => a.name === agentStatus.name);
+            const color = this.getAgentColor ? this.getAgentColor(agentStatus.name) : '#ffffff';
+            const statusText = agentStatus.available ? 'available' : 'cooldown';
+            const contextWindow = agent ? agent.contextWindowTokens.toLocaleString() : 'unknown';
+            
+            this.sendWebSocketMessage(clientId, {
+              type: 'system',
+              message: `- {bold}{${color}-fg}${agentStatus.name}{/${color}-fg}{/bold}`
+            });
+            this.sendWebSocketMessage(clientId, {
+              type: 'system',
+              message: `    status:         ${statusText}`
+            });
+            this.sendWebSocketMessage(clientId, {
+              type: 'system',
+              message: `    context window: ${contextWindow}`
+            });
+          });
+        }
+        break;
+        
+      case 'strategy':
+        if (args.length > 0) {
+          const strategy = args[0];
+          if (this.agentManager.setStrategy(strategy)) {
+            this.sendWebSocketMessage(clientId, {
+              type: 'system',
+              message: `Rotation strategy set to: ${strategy}`
+            });
+          } else {
+            this.sendWebSocketMessage(clientId, {
+              type: 'system',
+              message: `Invalid strategy: ${strategy}`
+            });
+            this.sendWebSocketMessage(clientId, {
+              type: 'system',
+              message: 'Available strategies: round-robin, exhaustion, random, manual'
+            });
+          }
+        } else {
+          const currentStrategy = this.agentManager.getStrategy();
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: `Current strategy: ${currentStrategy}`
+          });
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: 'Available strategies:'
+          });
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: '  round-robin - Rotate through agents in order'
+          });
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: '  exhaustion - Always try agents in priority order (list order)'
+          });
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: '  random - Pick agents randomly'
+          });
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: '  manual - Use selected agent only, no rotation'
+          });
+        }
+        break;
+        
+      case 'init':
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: 'Initializing project...'
+        });
+        
+        // Get the next agent for initialization
+        const initAgent = this.agentManager.getNextAgent();
+        if (initAgent) {
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: 'Web interface does not support /init command. Please use the TUI for project initialization.'
+          });
+        } else {
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: 'No agents configured. Please add agents to ~/.termaite/settings.json'
+          });
+        }
+        break;
+        
+      case 'instructions':
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: 'Web interface does not support editing instructions file. Please use the TUI or edit ~/.termaite/TERMAITE.md directly.'
+        });
         break;
         
       default:
@@ -1204,11 +1462,11 @@ body {
 }
 
 .message.system {
-    color: #00ff00;
-    font-style: italic;
+    color: #cccccc;
+    font-style: normal;
 }
 .message.shell {
-    color: #00ff00;
+    color: #cccccc;
     white-space: pre-wrap;
 }
 
@@ -1474,34 +1732,46 @@ input:focus {
         return this.spinnerColors[Math.floor(Math.random() * this.spinnerColors.length)];
     }
     
-    getAgentColor(agentName) {
-        // Rich color palette for agents (matching TUI)
-        const colors = [
-            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD',
-            '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA',
-            '#FF8A80', '#80CBC4', '#81C784', '#FFB74D', '#F06292', '#9575CD',
-            '#4FC3F7', '#AED581', '#FFD54F', '#A1887F', '#90A4AE', '#EF5350',
-            '#26A69A', '#AB47BC', '#5C6BC0', '#42A5F5', '#66BB6A', '#FFCA28',
-            '#FF7043', '#8D6E63', '#78909C', '#EC407A', '#7E57C2', '#29B6F6',
-            '#FFAB91', '#C5E1A5', '#FFF176', '#BCAAA4', '#B0BEC5', '#FFCDD2',
-            '#E1BEE7', '#C8E6C9', '#FFF9C4', '#D7CCC8', '#CFD8DC', '#FFCCBC'
-        ];
-        
-        // Use same hash algorithm as TUI
-        let hash = 0;
-        for (let i = 0; i < agentName.length; i++) {
-            const char = agentName.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32bit integer
-        }
-        
-        const colorIndex = Math.abs(hash) % colors.length;
-        return colors[colorIndex];
-    }
-    
     formatAgentOutput(text) {
         // Simplified formatting to avoid regex issues
         return this.escapeHtml(text).replace(/\\n/g, '<br>');
+    }
+    
+    formatSystemMessage(text) {
+        // Convert blessed.js-style formatting tags to HTML/CSS
+        let formatted = this.escapeHtml(text);
+        
+        // Handle bold tags
+        formatted = formatted.replace(/\\{bold\\}(.*?)\\{\\/bold\\}/g, '<strong>$1</strong>');
+        
+        // Handle color tags with dynamic agent colors
+        const colorRegex = /\\{([a-zA-Z0-9#]+)-fg\\}(.*?)\\{\\/([a-zA-Z0-9#]+)-fg\\}/g;
+        formatted = formatted.replace(colorRegex, (match, color, content, closeColor) => {
+            // Handle hex colors or named colors
+            if (color.startsWith('#')) {
+                return '<span style="color: ' + color + '">' + content + '</span>';
+            } else {
+                // Map blessed color names to CSS
+                const colorMap = {
+                    'red': '#ff4444',
+                    'green': '#00ff00', 
+                    'blue': '#4444ff',
+                    'yellow': '#ffff00',
+                    'cyan': '#00ffff',
+                    'magenta': '#ff00ff',
+                    'white': '#ffffff',
+                    'gray': '#808080',
+                    'grey': '#808080'
+                };
+                const cssColor = colorMap[color] || color;
+                return '<span style="color: ' + cssColor + '">' + content + '</span>';
+            }
+        });
+        
+        // Handle line breaks
+        formatted = formatted.replace(/\\n/g, '<br>');
+        
+        return formatted;
     }
     
     startSpinner() {
@@ -1910,18 +2180,18 @@ input:focus {
                 break;
                 
             case 'system':
-                // Match TUI: Pass through as-is
+                // Match TUI: Use formatting for blessed.js-style tags
                 // Check if it's a shell command (starts with '$')
                 if (content.startsWith('$')) {
                     messageEl.innerHTML = '<span style="color: #00ff00">' + this.escapeHtml(content) + '</span>';
                 } else {
-                    messageEl.textContent = content;
+                    messageEl.innerHTML = this.formatSystemMessage(content);
                 }
                 break;
                 
             case 'shell':
-                // Green text for shell output (matching TUI {green-fg})
-                messageEl.innerHTML = '<span style="color: #00ff00">' + this.escapeHtml(content) + '</span>';
+                // Default gray text for shell output (matching TUI default)
+                messageEl.textContent = content;
                 break;
                 
             case 'error':
@@ -2177,12 +2447,63 @@ input:focus {
             console.error('Error getting current path:', error);
         }
     }
+    
+    getAgentColor(agentName) {
+        // Rich color palette for agents (matching TUI)
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD',
+            '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA',
+            '#FF8A80', '#80CBC4', '#81C784', '#FFB74D', '#F06292', '#9575CD',
+            '#4FC3F7', '#AED581', '#FFD54F', '#A1887F', '#90A4AE', '#EF5350',
+            '#26A69A', '#AB47BC', '#5C6BC0', '#42A5F5', '#66BB6A', '#FFCA28',
+            '#FF7043', '#8D6E63', '#78909C', '#EC407A', '#7E57C2', '#29B6F6',
+            '#8BC34A', '#FFAB40', '#8E24AA', '#43A047', '#FB8C00', '#5E35B1',
+            '#00ACC1', '#C0CA33', '#FF5722', '#6D4C41', '#546E7A', '#D81B60'
+        ];
+        
+        // Generate hash from agent name
+        let hash = 0;
+        for (let i = 0; i < agentName.length; i++) {
+            const char = agentName.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        
+        // Use hash to select color
+        const colorIndex = Math.abs(hash) % colors.length;
+        return colors[colorIndex];
+    }
 }
 
 // Initialize the application when the page loads
 document.addEventListener('DOMContentLoaded', () => {
     new TermaiteWebApp();
 });`;
+  }
+  
+  getAgentColor(agentName) {
+    // Rich color palette for agents (matching TUI)
+    const colors = [
+      '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD',
+      '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA',
+      '#FF8A80', '#80CBC4', '#81C784', '#FFB74D', '#F06292', '#9575CD',
+      '#4FC3F7', '#AED581', '#FFD54F', '#A1887F', '#90A4AE', '#EF5350',
+      '#26A69A', '#AB47BC', '#5C6BC0', '#42A5F5', '#66BB6A', '#FFCA28',
+      '#FF7043', '#8D6E63', '#78909C', '#EC407A', '#7E57C2', '#29B6F6',
+      '#FFAB91', '#C5E1A5', '#FFF176', '#BCAAA4', '#B0BEC5', '#FFCDD2',
+      '#E1BEE7', '#C8E6C9', '#FFF9C4', '#D7CCC8', '#CFD8DC', '#FFCCBC'
+    ];
+    
+    // Use same hash algorithm as TUI
+    let hash = 0;
+    for (let i = 0; i < agentName.length; i++) {
+      const char = agentName.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    
+    const colorIndex = Math.abs(hash) % colors.length;
+    return colors[colorIndex];
   }
 }
 
