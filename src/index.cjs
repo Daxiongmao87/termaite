@@ -31,6 +31,7 @@ const HistoryManager = require('./managers/HistoryManager.cjs');
 const AgentManager = require('./managers/AgentManager.cjs');
 const AgentWrapper = require('./services/AgentWrapper.cjs');
 const HistoryCompactor = require('./managers/HistoryCompactor.cjs');
+const { estimateTokenCount } = require('./utils/tokenEstimator.cjs');
 const SpinnerAnimation = require('./components/SpinnerAnimation.cjs');
 const { spawn } = require('child_process');
 const os = require('os');
@@ -266,21 +267,6 @@ if (argv.rotation) {
 // Create the history compactor
 const historyCompactor = new HistoryCompactor(configManager, historyManager);
 
-// Check if compaction is needed
-if (historyCompactor.isCompactionNeeded()) {
-  // Get the next agent for summarization
-  const agent = agentManager.getNextAgent();
-  if (agent) {
-    historyCompactor.compactHistory(agent)
-      .then(() => {
-        // Log success
-      })
-      .catch((error) => {
-        console.error('Error compacting history:', error);
-      });
-  }
-}
-
 // Create the chat UI
 const chatUI = new GradientChatUI(historyManager);
 
@@ -360,8 +346,8 @@ async function handleSlashCommand(text) {
       const agent = agentManager.getNextAgent();
       if (agent) {
         try {
-          await historyCompactor.manualCompactHistory(agent);
-          chatUI.addMessage('History compacted successfully', 'system');
+          const stats = await historyCompactor.manualCompactHistory(agent);
+          chatUI.addMessage(`History compacted successfully: ${stats.entriesSummarized} entries → 1 summary (${stats.tokensSaved} tokens saved)`, 'system');
         } catch (error) {
           chatUI.addMessage(`Error compacting history: ${error.message}`, 'system');
         }
@@ -752,6 +738,25 @@ chatUI.getInputBox().on('submit', async (text) => {
     chatUI.getInputBox().focus();
     chatUI.getScreen().render();
     
+    // Simple input size handling like gemini-cli
+    const inputTokens = estimateTokenCount(text);
+    const agents = configManager.getAgents();
+    if (agents.length > 0) {
+      const smallestContext = Math.min(...agents.map(a => a.contextWindowTokens));
+      const maxInputTokens = Math.floor(smallestContext * 0.5); // 50% of smallest context
+      
+      if (inputTokens > maxInputTokens) {
+        // Auto-truncate like gemini-cli
+        const targetChars = maxInputTokens * 4; // Rough estimate
+        const truncatedText = text.substring(0, targetChars) + '... [TRUNCATED]';
+        const newTokens = estimateTokenCount(truncatedText);
+        
+        chatUI.addMessage(`⚠️  Input truncated: ${inputTokens} → ${newTokens} tokens`, 'system');
+        text = truncatedText;
+        chatUI.getScreen().render();
+      }
+    }
+    
     // Add to both user inputs (for arrow navigation) and chat history (for context)
     historyManager.writeUserInput(text);
     
@@ -806,6 +811,22 @@ chatUI.getInputBox().on('submit', async (text) => {
       try {
         const history = historyManager.readHistory();
         const globalTimeout = configManager.getGlobalTimeout();
+        
+        // Check if automatic compaction is needed before processing (including incoming text)
+        if (historyCompactor.isCompactionNeeded(text)) {
+          chatUI.addMessage('Auto-compacting history to maintain context window...', 'system');
+          chatUI.getScreen().render();
+          
+          try {
+            const stats = await historyCompactor.compactHistory(agent);
+            chatUI.addMessage(`History auto-compacted: ${stats.entriesSummarized} entries (${stats.tokensSaved} tokens saved)`, 'system');
+          } catch (error) {
+            chatUI.addMessage(`Warning: Auto-compaction failed: ${error.message}`, 'system');
+            // Continue with message processing even if compaction fails
+          }
+          chatUI.getScreen().render();
+        }
+        
         const result = await AgentWrapper.executeAgentCommand(agent, text, history, globalTimeout);
         
         // Check if agent failed (non-zero exit code)

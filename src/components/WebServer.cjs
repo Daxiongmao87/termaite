@@ -7,6 +7,7 @@ const HistoryManager = require('../managers/HistoryManager.cjs');
 const AgentManager = require('../managers/AgentManager.cjs');
 const AgentWrapper = require('../services/AgentWrapper.cjs');
 const HistoryCompactor = require('../managers/HistoryCompactor.cjs');
+const { estimateTokenCount } = require('../utils/tokenEstimator.cjs');
 
 class WebServer {
   constructor() {
@@ -634,6 +635,27 @@ class WebServer {
       return;
     }
     
+    // Simple input size handling like gemini-cli
+    const inputTokens = estimateTokenCount(text);
+    const agents = this.configManager.getAgents();
+    if (agents.length > 0) {
+      const smallestContext = Math.min(...agents.map(a => a.contextWindowTokens));
+      const maxInputTokens = Math.floor(smallestContext * 0.5); // 50% of smallest context
+      
+      if (inputTokens > maxInputTokens) {
+        // Auto-truncate like gemini-cli
+        const targetChars = maxInputTokens * 4; // Rough estimate
+        const truncatedText = text.substring(0, targetChars) + '... [TRUNCATED]';
+        const newTokens = estimateTokenCount(truncatedText);
+        
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: `⚠️  Input truncated: ${inputTokens} → ${newTokens} tokens`
+        });
+        text = truncatedText;
+      }
+    }
+    
     // Add user message to history and user inputs (for arrow navigation)
     this.historyManager.writeUserInput(text);
     
@@ -645,6 +667,28 @@ class WebServer {
         message: 'No agents configured. Please check your settings.'
       });
       return;
+    }
+    
+    // Check if automatic compaction is needed before processing (including incoming text)
+    if (this.historyCompactor.isCompactionNeeded(text)) {
+      this.sendWebSocketMessage(clientId, {
+        type: 'system',
+        message: 'Auto-compacting history to maintain context window...'
+      });
+      
+      try {
+        const stats = await this.historyCompactor.compactHistory(agent);
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: `History auto-compacted: ${stats.entriesSummarized} entries (${stats.tokensSaved} tokens saved)`
+        });
+      } catch (error) {
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: `Warning: Auto-compaction failed: ${error.message}`
+        });
+        // Continue with message processing even if compaction fails
+      }
     }
     
     // Send agent announcement
@@ -965,10 +1009,10 @@ class WebServer {
         const agent = this.agentManager.getNextAgent();
         if (agent) {
           try {
-            await this.historyCompactor.manualCompactHistory(agent);
+            const stats = await this.historyCompactor.manualCompactHistory(agent);
             this.sendWebSocketMessage(clientId, {
               type: 'system',
-              message: 'History compacted successfully'
+              message: `History compacted successfully: ${stats.entriesSummarized} entries → 1 summary (${stats.tokensSaved} tokens saved)`
             });
           } catch (error) {
             this.sendWebSocketMessage(clientId, {
