@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.7](https://github.com/Daxiongmao87/termaite/compare/v0.2.6...v0.2.7) (2025-08-26)
+
+
+### 📝 Documentation
+
+* update README.md to accurately reflect features and commands ([daf3021](https://github.com/Daxiongmao87/termaite/commit/daf302142f587a19f53995245625442e77384ea1))
+
+
+### 🐛 Bug Fixes
+
+* arrow key history navigation in web interface ([aab1422](https://github.com/Daxiongmao87/termaite/commit/aab1422d140229eca69f904fd71e90d64d318fb2))
+* implement full /init command parity between web UI and TUI ([4ca401f](https://github.com/Daxiongmao87/termaite/commit/4ca401f06ebaa5a7457b72c105d17ab53c4700fc))
+* improve history management and web interface UX ([835b7d9](https://github.com/Daxiongmao87/termaite/commit/835b7d9d8f9217cd82092cf6018feaac22c634e4))
+* improve web interface input handling and arrow key navigation ([d926641](https://github.com/Daxiongmao87/termaite/commit/d9266417bf769dc2c1de2898b60e5b39e5300f8b))
+* resolve /select command hanging and implement slash command parity ([ddee55a](https://github.com/Daxiongmao87/termaite/commit/ddee55ab4d67eb1ae390d0a2ed11607637e5ebfd))
+* resolve web interface regex errors and slash command display ([a83c489](https://github.com/Daxiongmao87/termaite/commit/a83c48926c85ee6b3f4cdcb0c29174ed99e1d7c1))
+
+
+### ✨ Features
+
+* add comprehensive web interface with autocomplete and enhanced UX ([8388918](https://github.com/Daxiongmao87/termaite/commit/8388918f44ba53da1d49668e8147f3cf0b1d6f74))
+* add simple input size handling and safety buffer ([9f88b5a](https://github.com/Daxiongmao87/termaite/commit/9f88b5a03d0f424cad4db5c7a05fc74dd30c671a))
+* enhance web interface UX to match TUI parity ([9adc6c4](https://github.com/Daxiongmao87/termaite/commit/9adc6c414b709b950a3406999c7c204efef6110d))
+
+
+### ♻️ Code Refactoring
+
+* simplify init command broadcast ([31a425a](https://github.com/Daxiongmao87/termaite/commit/31a425ab9d5066c4fb9a5784f6c9281a0fc0d8ae))
+
 ### [0.2.6](https://github.com/Daxiongmao87/termaite/compare/v0.2.5...v0.2.6) (2025-08-25)
 
 
