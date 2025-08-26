@@ -1157,54 +1157,8 @@ class WebServer {
         break;
         
       case 'init':
-        this.sendWebSocketMessage(clientId, {
-          type: 'system',
-          message: 'Initializing project...'
-        });
-        
-        // Get the next agent for initialization
-        const initAgent = this.agentManager.getNextAgent();
-        if (initAgent) {
-          // Set agent running state and disable input
-          this.agentIsRunning = true;
-          
-          // Start agent announcement with spinner
-          this.sendWebSocketMessage(clientId, {
-            type: 'agent_start',
-            message: `Agent (${initAgent.name}):`
-          });
-          
-          try {
-            const globalTimeout = this.configManager.getGlobalTimeout();
-            this.configManager.propagateInstructions();
-            const result = await AgentWrapper.executeAgentCommand(
-              initAgent, 
-              'Please investigate the current project and write comprehensive yet high-level details of the project and general guidelines in working in it.', 
-              [],
-              globalTimeout
-            );
-            
-            // Send agent response
-            this.sendWebSocketMessage(clientId, {
-              type: 'agent',
-              message: result.stdout
-            });
-            
-            // Add agent response to history
-            this.historyManager.writeHistory({
-              sender: 'agent',
-              text: result.stdout,
-              timestamp: new Date().toISOString()
-            });
-          } catch (error) {
-            this.sendWebSocketMessage(clientId, {
-              type: 'system',
-              message: `Error initializing project: ${error.message}`
-            });
-          } finally {
-            this.agentIsRunning = false;
-          }
-        } else {
+        const allAgents = this.configManager.getAgents();
+        if (allAgents.length === 0) {
           this.sendWebSocketMessage(clientId, {
             type: 'system',
             message: 'No agents configured. Please add agents to ~/.termaite/settings.json'
@@ -1213,6 +1167,52 @@ class WebServer {
             type: 'system',
             message: 'Use /config to open the settings file'
           });
+          break;
+        }
+
+        this.sendWebSocketMessage(clientId, {
+          type: 'system',
+          message: 'Initializing project...'
+        });
+        
+        // Set agent running state to disable input during initialization
+        this.agentIsRunning = true;
+        
+        try {
+          const globalTimeout = this.configManager.getGlobalTimeout();
+          this.configManager.propagateInstructions();
+          
+          // Send /init to all agents in parallel
+          const initPromises = allAgents.map(async (agent) => {
+            try {
+              this.sendWebSocketMessage(clientId, {
+                type: 'system',
+                message: `Initializing ${agent.name}...`
+              });
+              await AgentWrapper.executeAgentCommand(agent, '/init', [], globalTimeout);
+              // Discard the response - agents handle their own initialization
+            } catch (error) {
+              this.sendWebSocketMessage(clientId, {
+                type: 'system',
+                message: `Warning: ${agent.name} initialization failed: ${error.message}`
+              });
+            }
+          });
+          
+          // Wait for all agents to complete
+          await Promise.all(initPromises);
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: 'Initialization complete'
+          });
+          
+        } catch (error) {
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: `Error during initialization: ${error.message}`
+          });
+        } finally {
+          this.agentIsRunning = false;
         }
         break;
         
@@ -2197,24 +2197,31 @@ input:focus {
     }
     
     handleMessage(data) {
+        console.log('[CLIENT DEBUG] Received WebSocket message:', data.type, '- Content length:', data.message ? data.message.length : 'no message');
+        console.log('[CLIENT DEBUG] Message preview:', data.message ? data.message.substring(0, 100) + '...' : 'no message');
+        
         switch (data.type) {
             case 'system':
+                console.log('[CLIENT DEBUG] Handling system message');
                 this.addMessage(data.message, 'system');
                 this.setInputEnabled(true);
                 break;
                 
             case 'agent':
+                console.log('[CLIENT DEBUG] Handling agent message, stopping spinner');
                 this.stopSpinner();
                 this.addMessage(data.message, 'agent');
                 this.setInputEnabled(true);
                 break;
                 
             case 'agent_start':
+                console.log('[CLIENT DEBUG] Handling agent_start message, starting spinner');
                 this.addMessage(data.message, 'agent-start');
                 this.startSpinner();
                 break;
                 
             case 'error':
+                console.log('[CLIENT DEBUG] Handling error message');
                 this.stopSpinner();
                 this.addMessage(data.message, 'error');
                 this.setInputEnabled(true);
@@ -2222,13 +2229,14 @@ input:focus {
                 break;
                 
             case 'clear':
+                console.log('[CLIENT DEBUG] Handling clear message');
                 this.elements.chatMessages.innerHTML = '';
                 this.addMessage(data.message, 'system');
                 this.setInputEnabled(true);
                 break;
                 
             default:
-                console.warn('Unknown message type:', data.type);
+                console.log('[CLIENT DEBUG] Unknown message type:', data.type, data);
         }
     }
     

@@ -452,41 +452,44 @@ async function handleSlashCommand(text) {
       break;
       
     case 'init':
+      const allAgents = configManager.getAgents();
+      if (allAgents.length === 0) {
+        chatUI.addMessage('No agents configured. Please add agents to ~/.termaite/settings.json', 'system');
+        chatUI.addMessage('Use /config to open the settings file', 'system');
+        break;
+      }
+
       chatUI.addMessage('Initializing project...', 'system');
       chatUI.getScreen().render();
       
-      // Get the next agent for initialization
-      const initAgent = agentManager.getNextAgent();
-      if (initAgent) {
-        // Start the spinner animation
-        spinnerAnimation.start();
+      // Start the spinner animation
+      spinnerAnimation.start();
+      
+      try {
+        const globalTimeout = configManager.getGlobalTimeout();
+        configManager.propagateInstructions();
         
-        try {
-          const globalTimeout = configManager.getGlobalTimeout();
-          configManager.propagateInstructions();
-          const result = await AgentWrapper.executeAgentCommand(
-            initAgent, 
-            'Please investigate the current project and write comprehensive yet high-level details of the project and general guidelines in working in it.', 
-            [],
-            globalTimeout
-          );
-          chatUI.addMessage(result.stdout, 'agent');
-          
-          // Add agent response to history
-          historyManager.writeHistory({
-            sender: 'agent',
-            text: result.stdout,
-            timestamp: new Date().toISOString()
-          });
-        } catch (error) {
-          chatUI.addMessage(`Error initializing project: ${error.message}`, 'system');
-        } finally {
-          // Stop the spinner animation
-          spinnerAnimation.stop();
-        }
-      } else {
-        chatUI.addMessage('No agents configured. Please add agents to ~/.termaite/settings.json', 'system');
-        chatUI.addMessage('Use /config to open the settings file', 'system');
+        // Send /init to all agents in parallel
+        const initPromises = allAgents.map(async (agent) => {
+          try {
+            chatUI.addMessage(`Initializing ${agent.name}...`, 'system');
+            chatUI.getScreen().render();
+            await AgentWrapper.executeAgentCommand(agent, '/init', [], globalTimeout);
+            // Discard the response - agents handle their own initialization
+          } catch (error) {
+            chatUI.addMessage(`Warning: ${agent.name} initialization failed: ${error.message}`, 'system');
+          }
+        });
+        
+        // Wait for all agents to complete
+        await Promise.all(initPromises);
+        chatUI.addMessage('Initialization complete', 'system');
+        
+      } catch (error) {
+        chatUI.addMessage(`Error during initialization: ${error.message}`, 'system');
+      } finally {
+        // Stop the spinner animation
+        spinnerAnimation.stop();
       }
       break;
       
