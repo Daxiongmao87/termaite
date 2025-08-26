@@ -1421,7 +1421,11 @@ input:focus {
         this.attachEventListeners();
         this.connectWebSocket();
         this.updateCurrentPath();
-        this.loadUserInputHistory();
+        
+        // Load user input history asynchronously
+        this.loadUserInputHistory().then(() => {
+            console.log('User input history loaded:', this.userInputHistory.length, 'entries');
+        });
     }
     
     getRandomSpinnerColor() {
@@ -1586,6 +1590,17 @@ input:focus {
         // Message form submission
         this.elements.inputForm.addEventListener('submit', (e) => {
             e.preventDefault();
+            
+            // Check if submit is disabled (agent running)
+            if (this.elements.submitButton.disabled) {
+                // Visual feedback that submission is blocked
+                this.elements.submitButton.style.backgroundColor = '#ff4444';
+                setTimeout(() => {
+                    this.elements.submitButton.style.backgroundColor = '';
+                }, 200);
+                return;
+            }
+            
             this.sendMessage();
         });
         
@@ -1593,10 +1608,15 @@ input:focus {
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 this.handleEscapeKey(e);
-            } else if (e.key === 'ArrowUp' && e.target === this.elements.messageInput) {
+            }
+        });
+        
+        // Arrow key history navigation (direct input listener)
+        this.elements.messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp') {
                 e.preventDefault();
                 this.navigateHistoryUp();
-            } else if (e.key === 'ArrowDown' && e.target === this.elements.messageInput) {
+            } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 this.navigateHistoryDown();
             }
@@ -1697,6 +1717,9 @@ input:focus {
     sendMessage() {
         const message = this.elements.messageInput.value.trim();
         if (!message) return;
+        
+        // Reset history navigation state
+        this.resetHistoryNavigation();
         
         // Add user message to chat immediately
         this.addMessage(message, 'user');
@@ -1816,9 +1839,10 @@ input:focus {
     }
     
     setInputEnabled(enabled) {
-        this.elements.messageInput.disabled = !enabled;
+        // Only disable submit button, keep input always enabled for typing
         this.elements.submitButton.disabled = !enabled;
         
+        // Focus input when re-enabled
         if (enabled) {
             this.elements.messageInput.focus();
         }
