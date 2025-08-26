@@ -1121,14 +1121,53 @@ class WebServer {
         // Get the next agent for initialization
         const initAgent = this.agentManager.getNextAgent();
         if (initAgent) {
+          // Set agent running state and disable input
+          this.agentIsRunning = true;
+          
+          // Start agent announcement with spinner
           this.sendWebSocketMessage(clientId, {
-            type: 'system',
-            message: 'Web interface does not support /init command. Please use the TUI for project initialization.'
+            type: 'agent_start',
+            message: `Agent (${initAgent.name}):`
           });
+          
+          try {
+            const globalTimeout = this.configManager.getGlobalTimeout();
+            this.configManager.propagateInstructions();
+            const result = await AgentWrapper.executeAgentCommand(
+              initAgent, 
+              'Please investigate the current project and write comprehensive yet high-level details of the project and general guidelines in working in it.', 
+              [],
+              globalTimeout
+            );
+            
+            // Send agent response
+            this.sendWebSocketMessage(clientId, {
+              type: 'agent',
+              message: result.stdout
+            });
+            
+            // Add agent response to history
+            this.historyManager.writeHistory({
+              sender: 'agent',
+              text: result.stdout,
+              timestamp: new Date().toISOString()
+            });
+          } catch (error) {
+            this.sendWebSocketMessage(clientId, {
+              type: 'system',
+              message: `Error initializing project: ${error.message}`
+            });
+          } finally {
+            this.agentIsRunning = false;
+          }
         } else {
           this.sendWebSocketMessage(clientId, {
             type: 'system',
             message: 'No agents configured. Please add agents to ~/.termaite/settings.json'
+          });
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: 'Use /config to open the settings file'
           });
         }
         break;
