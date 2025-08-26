@@ -371,8 +371,13 @@ class WebServer {
   handleHistoryRequest(res) {
     try {
       const userInputs = this.historyManager.readUserInputs();
+      const chatHistory = this.historyManager.readHistory();
+      
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ userInputs }));
+      res.end(JSON.stringify({ 
+        userInputs, 
+        chatHistory 
+      }));
     } catch (error) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Failed to load history' }));
@@ -1161,6 +1166,43 @@ body {
     white-space: pre-wrap;
 }
 
+/* Enhanced styling for agent output formatting */
+.message.agent pre {
+    background: #1e1e1e;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 8px;
+    overflow-x: auto;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+.message.agent code {
+    background: #2a2a2a;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+.message.agent pre code {
+    background: transparent;
+    padding: 0;
+}
+
+/* Better color visibility against dark background */
+.message.agent span[style*="color: yellow"] {
+    color: #ffff88 !important;
+}
+
+.message.agent span[style*="color: cyan"] {
+    color: #88ffff !important;
+}
+
+.message.agent span[style*="color: white"] {
+    color: #ffffff !important;
+}
+
 .message.system {
     color: #00ff00;
     font-style: italic;
@@ -1422,14 +1464,44 @@ input:focus {
         this.connectWebSocket();
         this.updateCurrentPath();
         
-        // Load user input history asynchronously
-        this.loadUserInputHistory().then(() => {
-            console.log('User input history loaded:', this.userInputHistory.length, 'entries');
+        // Load both user input history and chat history asynchronously
+        this.loadHistory().then(() => {
+            console.log('History loaded:', this.userInputHistory.length, 'user inputs');
         });
     }
     
     getRandomSpinnerColor() {
         return this.spinnerColors[Math.floor(Math.random() * this.spinnerColors.length)];
+    }
+    
+    getAgentColor(agentName) {
+        // Rich color palette for agents (matching TUI)
+        const colors = [
+            '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD',
+            '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA',
+            '#FF8A80', '#80CBC4', '#81C784', '#FFB74D', '#F06292', '#9575CD',
+            '#4FC3F7', '#AED581', '#FFD54F', '#A1887F', '#90A4AE', '#EF5350',
+            '#26A69A', '#AB47BC', '#5C6BC0', '#42A5F5', '#66BB6A', '#FFCA28',
+            '#FF7043', '#8D6E63', '#78909C', '#EC407A', '#7E57C2', '#29B6F6',
+            '#FFAB91', '#C5E1A5', '#FFF176', '#BCAAA4', '#B0BEC5', '#FFCDD2',
+            '#E1BEE7', '#C8E6C9', '#FFF9C4', '#D7CCC8', '#CFD8DC', '#FFCCBC'
+        ];
+        
+        // Use same hash algorithm as TUI
+        let hash = 0;
+        for (let i = 0; i < agentName.length; i++) {
+            const char = agentName.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        
+        const colorIndex = Math.abs(hash) % colors.length;
+        return colors[colorIndex];
+    }
+    
+    formatAgentOutput(text) {
+        // Simplified formatting to avoid regex issues
+        return this.escapeHtml(text).replace(/\\n/g, '<br>');
     }
     
     startSpinner() {
@@ -1512,7 +1584,7 @@ input:focus {
         this.addMessage('Cancelled by user', 'system');
     }
     
-    async loadUserInputHistory() {
+    async loadHistory() {
         try {
             const response = await fetch('/api/history', {
                 method: 'GET',
@@ -1522,9 +1594,37 @@ input:focus {
             if (response.ok) {
                 const data = await response.json();
                 this.userInputHistory = data.userInputs || [];
+                
+                // Display existing chat history
+                const chatHistory = data.chatHistory || [];
+                if (chatHistory.length > 0) {
+                    console.log('Loading', chatHistory.length, 'chat history entries');
+                    chatHistory.forEach(entry => {
+                        this.displayHistoryEntry(entry);
+                    });
+                }
             }
         } catch (error) {
-            console.error('Error loading input history:', error);
+            console.error('Error loading history:', error);
+        }
+    }
+    
+    displayHistoryEntry(entry) {
+        switch (entry.sender) {
+            case 'user':
+                this.addMessage(entry.text, 'user');
+                break;
+            case 'agent':
+                this.addMessage(entry.text, 'agent');
+                break;
+            case 'system':
+                this.addMessage(entry.text, 'system');
+                break;
+            case 'shell':
+                this.addMessage(entry.text, 'shell');
+                break;
+            default:
+                this.addMessage(entry.text, 'system');
         }
     }
     
@@ -1781,31 +1881,39 @@ input:focus {
     
     addMessage(content, type) {
         const messageEl = document.createElement('div');
-        messageEl.className = \`message \${type}\`;
+        messageEl.className = 'message ' + type;
         
         // Handle different message types to match TUI formatting
         switch (type) {
             case 'user':
                 // Match TUI: {bold}You:{/bold} message
-                messageEl.innerHTML = \`<strong>You:</strong> \${this.escapeHtml(content)}\`;
+                messageEl.innerHTML = '<strong>You:</strong> ' + this.escapeHtml(content);
                 break;
                 
             case 'agent':
-                // Match TUI: Just the content, no prefix
-                messageEl.textContent = content;
+                // Match TUI: Format agent output with proper rendering
+                messageEl.innerHTML = this.formatAgentOutput(content);
                 this.updateAgentStatus('');
                 break;
                 
             case 'agent-start':
-                // Match TUI: Agent announcement
-                messageEl.innerHTML = \`<strong>\${this.escapeHtml(content)}</strong>\`;
+                // Match TUI: Agent announcement with dynamic color
+                // Extract agent name from "Agent (name):" format
+                const agentMatch = content.match(/Agent \\(([^)]+)\\):/);
+                if (agentMatch) {
+                    const agentName = agentMatch[1];
+                    const agentColor = this.getAgentColor(agentName);
+                    messageEl.innerHTML = '<strong style="color: ' + agentColor + '">' + this.escapeHtml(content) + '</strong>';
+                } else {
+                    messageEl.innerHTML = '<strong>' + this.escapeHtml(content) + '</strong>';
+                }
                 break;
                 
             case 'system':
                 // Match TUI: Pass through as-is
                 // Check if it's a shell command (starts with '$')
                 if (content.startsWith('$')) {
-                    messageEl.innerHTML = \`<span style="color: #00ff00">\${this.escapeHtml(content)}</span>\`;
+                    messageEl.innerHTML = '<span style="color: #00ff00">' + this.escapeHtml(content) + '</span>';
                 } else {
                     messageEl.textContent = content;
                 }
@@ -1813,7 +1921,7 @@ input:focus {
                 
             case 'shell':
                 // Green text for shell output (matching TUI {green-fg})
-                messageEl.innerHTML = \`<span style="color: #00ff00">\${this.escapeHtml(content)}</span>\`;
+                messageEl.innerHTML = '<span style="color: #00ff00">' + this.escapeHtml(content) + '</span>';
                 break;
                 
             case 'error':
@@ -1842,14 +1950,16 @@ input:focus {
         // Only disable submit button, keep input always enabled for typing
         this.elements.submitButton.disabled = !enabled;
         
-        // Focus input when re-enabled
+        // Focus input when re-enabled (with slight delay to ensure DOM updates complete)
         if (enabled) {
-            this.elements.messageInput.focus();
+            setTimeout(() => {
+                this.elements.messageInput.focus();
+            }, 10);
         }
     }
     
     updateConnectionStatus(status, text) {
-        this.elements.connectionStatus.className = \`connection-status \${status}\`;
+        this.elements.connectionStatus.className = 'connection-status ' + status;
         this.elements.connectionStatus.textContent = text;
     }
     
