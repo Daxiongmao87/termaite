@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.8](https://github.com/Daxiongmao87/termaite/compare/v0.2.7...v0.2.8) (2025-08-26)
+
+
+### 📝 Documentation
+
+* update README with web interface and missing features ([4693c4b](https://github.com/Daxiongmao87/termaite/commit/4693c4b9eaca7fffb95f90d60a3e230cd233be7d))
+
 ### [0.2.7](https://github.com/Daxiongmao87/termaite/compare/v0.2.6...v0.2.7) (2025-08-26)
 
 
