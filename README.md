@@ -51,7 +51,7 @@ termaite
 ```
 On first run, TERMAITE creates a starter configuration file at `~/.termaite/settings.json`. You control which agents to add and how they are invoked.
 
-### 2. Interactive Chat
+### 2. Interactive Chat - Terminal Interface
 ```bash
 # Start chatting with automatic agent management
 termaite
@@ -63,7 +63,19 @@ termaite -c
 termaite --agent claude
 ```
 
-### 3. Non-Interactive Usage
+### 3. Interactive Chat - Web Interface
+```bash
+# Launch web interface (opens browser to http://localhost:3000)
+termaite --web
+
+# Launch on custom port
+termaite --web 8080
+
+# Web interface with agent continuation
+termaite --web --continue
+```
+
+### 4. Non-Interactive Usage
 ```bash
 # Quick command execution
 termaite --prompt "Explain quantum computing"
@@ -100,6 +112,14 @@ result=$(termaite --prompt "Generate a secure random password")
 - Intelligent history summarization
 - Configurable context windows per agent
 
+### 🌐 **Web Interface**
+- Modern web-based UI accessible via browser
+- Complete feature parity with terminal interface
+- Real-time WebSocket communication
+- Auto-complete and enhanced UX features
+- Arrow key history navigation
+- All slash commands and agent management
+
 ## 📋 Commands & Options
 
 ### Command Line Flags
@@ -116,6 +136,8 @@ Options:
   -p, --prompt    Enables non-interactive mode. The application will execute a
                   single prompt with the chosen agent, print the result to
                   stdout, and then exit                                 [string]
+  -w, --web       Launch web interface instead of terminal interface. 
+                  Optionally specify port (default: 3000)              [number]
 ```
 
 ### Slash Commands (Interactive Mode)
@@ -123,12 +145,13 @@ Options:
 /help           Show available commands
 /clear          Clear chat history
 /config         Edit settings in $EDITOR
-/init           Analyze and document current project
+/init           Initialize project (broadcasts to all agents)
 /compact        Manually trigger history compaction
 /select         Switch to specific agent
 /strategy       Change rotation strategy
 /agents         List available agents
 /instructions   View/edit agent instructions
+/sh <command>   Execute shell command
 /exit           Exit application
 ```
 
@@ -192,6 +215,7 @@ termaite -c  # Continues website conversation
 
 ### Development Workflow
 ```bash
+# Terminal Interface
 # Initialize project understanding
 termaite
 > /init
@@ -202,6 +226,12 @@ cat complex_algorithm.py | termaite --prompt "Explain this algorithm"
 # Interactive debugging session
 termaite --agent claude
 > Help me debug this error: [paste error]
+
+# Web Interface
+# Launch web UI for comfortable development
+termaite --web
+# Navigate to http://localhost:3000
+# Use all the same commands with enhanced UX
 ```
 
 ### Multi-Agent Strategies
