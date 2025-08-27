@@ -59,6 +59,11 @@ const argv = yargs(processedArgs)
     type: 'string',
     description: 'Enables non-interactive mode. The application will execute a single prompt with the chosen agent, print the result to stdout, and then exit'
   })
+  .option('web', {
+    alias: 'w',
+    type: 'string',
+    description: 'Start web interface. Optional [host:]port format (default: 127.0.0.1:7378)'
+  })
   .argv;
 
 // If in web mode, start the web server
