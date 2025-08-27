@@ -38,7 +38,10 @@ const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
+const pkg = require('../package.json');
+
 const argv = yargs(processedArgs)
+  .version(pkg.version)
   .option('continue', {
     alias: 'c',
     type: 'boolean',
@@ -64,6 +67,7 @@ const argv = yargs(processedArgs)
     type: 'string',
     description: 'Start web interface. Optional [host:]port format (default: 127.0.0.1:7378)'
   })
+  .alias('version', 'V')
   .argv;
 
 // If in web mode, start the web server
