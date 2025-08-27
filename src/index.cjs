@@ -68,6 +68,7 @@ const argv = yargs(processedArgs)
     description: 'Start web interface. Optional [host:]port format (default: 127.0.0.1:7378)'
   })
   .alias('version', 'V')
+  .alias('help', 'h')
   .argv;
 
 // If in web mode, start the web server
