@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.10](https://github.com/Daxiongmao87/termaite/compare/v0.2.9...v0.2.10) (2025-08-27)
+
+
+### ✨ Features
+
+* add -V short alias for --version flag ([4bd62b3](https://github.com/Daxiongmao87/termaite/commit/4bd62b335d18f241d7856f6ae91782ee414d0ebc))
+
 ### [0.2.9](https://github.com/Daxiongmao87/termaite/compare/v0.2.8...v0.2.9) (2025-08-27)
 
 
