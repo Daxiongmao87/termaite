@@ -925,7 +925,14 @@ class WebServer {
         status.agents.forEach(agentStatus => {
           const agent = agents.find(a => a.name === agentStatus.name);
           const color = this.getAgentColor ? this.getAgentColor(agentStatus.name) : '#ffffff';
-          const statusText = agentStatus.available ? 'available' : 'cooldown';
+          let statusText;
+          if (!agentStatus.enabled) {
+            statusText = 'disabled';
+          } else if (agentStatus.available) {
+            statusText = 'available';
+          } else {
+            statusText = 'cooldown';
+          }
           const contextWindow = agent ? agent.contextWindowTokens.toLocaleString() : 'unknown';
           
           // Agent name with color
@@ -1164,7 +1171,14 @@ class WebServer {
           status.agents.forEach(agentStatus => {
             const agent = agents.find(a => a.name === agentStatus.name);
             const color = this.getAgentColor ? this.getAgentColor(agentStatus.name) : '#ffffff';
-            const statusText = agentStatus.available ? 'available' : 'cooldown';
+            let statusText;
+            if (!agentStatus.enabled) {
+              statusText = 'disabled';
+            } else if (agentStatus.available) {
+              statusText = 'available';
+            } else {
+              statusText = 'cooldown';
+            }
             const contextWindow = agent ? agent.contextWindowTokens.toLocaleString() : 'unknown';
             
             this.sendWebSocketMessage(clientId, {
@@ -2425,6 +2439,9 @@ input:focus {
                 this.elements.pathStatus.textContent = '✅ Path updated';
                 this.elements.pathStatus.className = 'path-status success';
                 this.elements.workingPath.value = result.currentPath;
+                
+                // Update agent status for new path
+                this.updateCurrentPath();
             } else {
                 this.elements.pathStatus.textContent = \`❌ \${result.message}\`;
                 this.elements.pathStatus.className = 'path-status error';
@@ -2611,9 +2628,40 @@ input:focus {
             this.elements.workingPath.value = status.currentPath;
             this.elements.workingPath.placeholder = status.currentPath;
             
+            // Update agent status display
+            this.updateAgentStatusDisplay(status.agentStatus);
+            
         } catch (error) {
             console.error('Error getting current path:', error);
         }
+    }
+    
+    updateAgentStatusDisplay(agentStatus) {
+        if (!agentStatus || !agentStatus.agents) {
+            this.updateAgentStatus('');
+            return;
+        }
+        
+        const enabledAgents = agentStatus.agents.filter(agent => agent.enabled);
+        const availableAgents = enabledAgents.filter(agent => agent.available);
+        const disabledAgents = agentStatus.agents.filter(agent => !agent.enabled);
+        
+        let statusText = '';
+        
+        if (agentStatus.selectedAgent) {
+            const selectedAgent = agentStatus.agents.find(a => a.name === agentStatus.selectedAgent);
+            if (selectedAgent) {
+                const status = selectedAgent.enabled ? (selectedAgent.available ? 'available' : 'cooldown') : 'disabled';
+                statusText = 'Selected: ' + agentStatus.selectedAgent + ' (' + status + ')';
+            }
+        } else {
+            statusText = availableAgents.length + '/' + enabledAgents.length + ' agents available';
+            if (disabledAgents.length > 0) {
+                statusText += ', ' + disabledAgents.length + ' disabled';
+            }
+        }
+        
+        this.updateAgentStatus(statusText);
     }
     
     getAgentColor(agentName) {
