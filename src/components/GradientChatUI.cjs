@@ -177,6 +177,20 @@ class GradientChatUI {
       process.exit(0);
     });
 
+    // Add global key handler to restore focus when typing
+    this.screen.key(['C-l'], () => {
+      // Ctrl+L to force focus restoration
+      this.inputBox.forceFocus();
+    });
+
+    // Add a general keypress handler to restore focus if user starts typing
+    this.screen.on('keypress', (ch, key) => {
+      // If the input box is not focused and user presses a printable character, restore focus
+      if (!this.inputBox.focused && ch && ch.length === 1 && ch >= ' ' && ch <= '~') {
+        this.inputBox.forceFocus();
+      }
+    });
+
     // Focus our input box
     this.inputBox.focus();
 

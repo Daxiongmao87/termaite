@@ -631,9 +631,10 @@ async function handleSlashCommand(text) {
           chatUI.addMessage(`Editor error: ${err.message}`, 'system');
         }
         
-        // Refocus the input box
-        chatUI.getInputBox().focus();
-        chatUI.getScreen().render();
+        // Refocus the input box with a small delay to ensure terminal is ready
+        setTimeout(() => {
+          chatUI.getInputBox().forceFocus();
+        }, 100);
       });
       break;
       
@@ -656,9 +657,10 @@ async function handleSlashCommand(text) {
           chatUI.addMessage(`Editor error: ${err.message}`, 'system');
         }
         
-        // Refocus the input box
-        chatUI.getInputBox().focus();
-        chatUI.getScreen().render();
+        // Refocus the input box with a small delay to ensure terminal is ready
+        setTimeout(() => {
+          chatUI.getInputBox().forceFocus();
+        }, 100);
       });
       break;
       
@@ -736,8 +738,10 @@ async function handleSlashCommand(text) {
             timestamp: new Date().toISOString()
           });
           
-          chatUI.getInputBox().focus();
-          chatUI.getScreen().render();
+          // Refocus with a small delay to ensure terminal is ready
+          setTimeout(() => {
+            chatUI.getInputBox().forceFocus();
+          }, 100);
         });
         
         process.on('error', (error) => {
@@ -751,8 +755,10 @@ async function handleSlashCommand(text) {
             timestamp: new Date().toISOString()
           });
           
-          chatUI.getInputBox().focus();
-          chatUI.getScreen().render();
+          // Refocus with a small delay to ensure terminal is ready
+          setTimeout(() => {
+            chatUI.getInputBox().forceFocus();
+          }, 100);
         });
         
         // Set timeout (30 seconds)
@@ -761,8 +767,11 @@ async function handleSlashCommand(text) {
             process.kill('SIGTERM');
             spinnerAnimation.stop();
             chatUI.addMessage(`{yellow-fg}Command timed out after 30 seconds{/yellow-fg}`, 'system');
-            chatUI.getInputBox().focus();
-            chatUI.getScreen().render();
+            // Refocus with a small delay to ensure terminal is ready
+            setTimeout(() => {
+              chatUI.getInputBox().focus();
+              chatUI.getScreen().render();
+            }, 100);
           }
         }, 30000);
         

@@ -230,6 +230,28 @@ class CustomInput {
   
   focus() {
     this.box.focus();
+    // Ensure the screen program cursor is properly managed
+    if (this.screen && this.screen.program) {
+      this.screen.program.showCursor();
+    }
+    // Force a render to ensure the focus state is properly displayed
+    this.screen.render();
+  }
+
+  /**
+   * Force focus restoration - useful after external processes like screen.exec()
+   */
+  forceFocus() {
+    // Reset focus state
+    this.focused = false;
+    // Focus the box
+    this.box.focus();
+    // Ensure cursor is visible
+    if (this.screen && this.screen.program) {
+      this.screen.program.showCursor();
+    }
+    // Force render
+    this.screen.render();
   }
   
   clearValue() {
