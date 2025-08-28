@@ -640,7 +640,7 @@ class WebServer {
     const agents = this.configManager.getAgents();
     if (agents.length > 0) {
       const smallestContext = Math.min(...agents.map(a => a.contextWindowTokens));
-      const maxInputTokens = Math.floor(smallestContext * 0.5); // 50% of smallest context
+      const maxInputTokens = Math.floor(smallestContext * 0.25); // 25% of smallest context
       
       if (inputTokens > maxInputTokens) {
         // Auto-truncate like gemini-cli
@@ -976,8 +976,13 @@ class WebServer {
           process.on('close', (exitCode) => {
             // Display output
             if (stdout.trim()) {
-              // Limit output size to prevent UI issues
-              const maxOutputSize = 10000;
+              // Limit output size to prevent UI issues - using 25% of smallest context window
+              const agents = this.configManager.getAgents();
+              let maxOutputSize = 10000; // Default fallback
+              if (agents.length > 0) {
+                const smallestContext = Math.min(...agents.map(a => a.contextWindowTokens));
+                maxOutputSize = Math.floor(smallestContext * 0.25 * 4); // 25% of smallest context window in characters
+              }
               const displayOutput = stdout.length > maxOutputSize 
                 ? stdout.substring(0, maxOutputSize) + '\n... (output truncated)'
                 : stdout.trim();
@@ -988,7 +993,13 @@ class WebServer {
             }
             
             if (stderr.trim()) {
-              const maxOutputSize = 10000;
+              // Limit error output size to prevent UI issues - using 25% of smallest context window
+              const agents = this.configManager.getAgents();
+              let maxOutputSize = 10000; // Default fallback
+              if (agents.length > 0) {
+                const smallestContext = Math.min(...agents.map(a => a.contextWindowTokens));
+                maxOutputSize = Math.floor(smallestContext * 0.25 * 4); // 25% of smallest context window in characters
+              }
               const displayError = stderr.length > maxOutputSize 
                 ? stderr.substring(0, maxOutputSize) + '\n... (error output truncated)'
                 : stderr.trim();

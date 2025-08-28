@@ -27,7 +27,7 @@ class AgentWrapper {
    */
   static async executeAgentCommand(agent, input, history, globalTimeout = null) {
     // Augment the prompt with a request for a summary
-    const augmentedInput = this.augmentPrompt(input, history);
+    const augmentedInput = this.augmentPrompt(input, history, agent);
     
     return new Promise((resolve, reject) => {
       // Priority: globalTimeout > agent.timeoutSeconds > default (300)
@@ -123,13 +123,16 @@ class AgentWrapper {
     
     // If there's history, include a summary of it for context
     if (history && history.length > 0) {
-      augmentedInput += '=== Previous conversation context ===\n';
+      augmentedInput += '=== Previous conversation context ===\\n';
       // Include last few exchanges for context (limit to prevent overwhelming the agent)
       const recentHistory = history.slice(-10); // Last 10 messages
       recentHistory.forEach(entry => {
-        augmentedInput += `${entry.sender}: ${entry.text.substring(0, 200)}${entry.text.length > 200 ? '...' : ''}\n`;
+        // Limit each message to 25% of its length
+        const maxChars = Math.floor(entry.text.length * 0.25); // 25% of the message length
+        augmentedInput += `${entry.sender}: ${entry.text.substring(0, maxChars)}${entry.text.length > maxChars ? '...' : ''}
+`;
       });
-      augmentedInput += '=== End of context ===\n\n';
+      augmentedInput += '=== End of context ===\\n\\n';
     }
     
     // Add the current user input
