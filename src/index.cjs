@@ -142,23 +142,83 @@ if (argv.prompt) {
     const globalTimeout = configManager.getGlobalTimeout();
     AgentWrapper.executeAgentCommand(agent, argv.prompt, historyManager.readHistory(), globalTimeout)
       .then(result => {
-        // Check if agent failed (non-zero exit code)
-        if (result.exitCode !== 0) {
-          console.error(`Agent ${agent.name} failed with exit code ${result.exitCode}`);
-          if (result.stderr) {
-            console.error('Error output:', result.stderr);
+        // Check if agent failed (non-zero exit code or empty output)
+        const isOutputEmpty = !result.stdout || result.stdout.trim() === '';
+        if (result.exitCode !== 0 || isOutputEmpty) {
+          if (isOutputEmpty) {
+            console.error(`Agent ${agent.name} failed: Empty response received`);
+          } else {
+            console.error(`Agent ${agent.name} failed with exit code ${result.exitCode}`);
+            if (result.stderr) {
+              console.error('Error output:', result.stderr);
+            }
           }
-          // Mark agent as failed and try next one
+          // Mark agent as failed
           agentManager.markAgentAsFailed(agent.name);
           
-          // Try to get another agent
-          const nextAgent = agentManager.getNextAgent();
-          if (nextAgent && nextAgent.name !== agent.name) {
-            console.error(`Retrying with agent: ${nextAgent.name}`);
-            // Propagate instructions before retry
-            configManager.propagateInstructions();
-            // Recursively try with next agent
-            return AgentWrapper.executeAgentCommand(nextAgent, argv.prompt, historyManager.readHistory(), globalTimeout);
+          // Try all available agents
+          const availableAgents = agentManager.getAvailableAgents();
+          const remainingAgents = availableAgents.filter(a => a.name !== agent.name);
+          
+          if (remainingAgents.length > 0) {
+            console.error(`Retrying with ${remainingAgents.length} alternative agents...`);
+            
+            // Try each remaining agent until one succeeds
+            let agentIndex = 0;
+            const tryNextAgent = () => {
+              if (agentIndex >= remainingAgents.length) {
+                console.error('All alternative agents failed');
+                process.exit(1);
+                return;
+              }
+              
+              const nextAgent = remainingAgents[agentIndex];
+              agentIndex++;
+              
+              console.error(`Retrying with agent: ${nextAgent.name}`);
+              // Propagate instructions before retry
+              configManager.propagateInstructions();
+              
+              AgentWrapper.executeAgentCommand(nextAgent, argv.prompt, historyManager.readHistory(), globalTimeout)
+                .then(retryResult => {
+                  const isRetryOutputEmpty = !retryResult.stdout || retryResult.stdout.trim() === '';
+                  if (retryResult.exitCode === 0 && !isRetryOutputEmpty) {
+                    // Success
+                    console.log(retryResult.stdout);
+                    // Add to history
+                    historyManager.writeHistory({
+                      sender: 'user',
+                      text: argv.prompt,
+                      timestamp: new Date().toISOString()
+                    });
+                    historyManager.writeHistory({
+                      sender: 'agent',
+                      text: retryResult.stdout,
+                      timestamp: new Date().toISOString()
+                    });
+                    process.exit(0);
+                  } else {
+                    // This agent also failed, try the next one
+                    if (isRetryOutputEmpty) {
+                      console.error(`Agent ${nextAgent.name} failed: Empty response received`);
+                    } else {
+                      console.error(`Agent ${nextAgent.name} failed with exit code ${retryResult.exitCode}`);
+                      if (retryResult.stderr) {
+                        console.error('Error output:', retryResult.stderr);
+                      }
+                    }
+                    agentManager.markAgentAsFailed(nextAgent.name);
+                    tryNextAgent(); // Try next agent
+                  }
+                })
+                .catch(error => {
+                  console.error(`Error with agent ${nextAgent.name}:`, error.message);
+                  agentManager.markAgentAsFailed(nextAgent.name);
+                  tryNextAgent(); // Try next agent
+                });
+            };
+            
+            tryNextAgent(); // Start trying remaining agents
           } else {
             console.error('No alternative agents available');
             process.exit(1);
@@ -183,37 +243,69 @@ if (argv.prompt) {
         console.error('Error executing agent:', error.message);
         agentManager.markAgentAsFailed(agent.name);
         
-        // Try to get another agent
-        const nextAgent = agentManager.getNextAgent();
-        if (nextAgent && nextAgent.name !== agent.name) {
-          console.error(`Retrying with agent: ${nextAgent.name}`);
-          // Try with next agent
-          AgentWrapper.executeAgentCommand(nextAgent, argv.prompt, historyManager.readHistory(), globalTimeout)
-            .then(result => {
-              if (result.exitCode === 0) {
-                console.log(result.stdout);
-                // Add to history
-                historyManager.writeHistory({
-                  sender: 'user',
-                  text: argv.prompt,
-                  timestamp: new Date().toISOString()
-                });
-                historyManager.writeHistory({
-                  sender: 'agent',
-                  text: result.stdout,
-                  timestamp: new Date().toISOString()
-                });
-                process.exit(0);
-              } else {
-                console.error(`Agent ${nextAgent.name} also failed with exit code ${result.exitCode}`);
-                process.exit(1);
-              }
-            })
-            .catch(err => {
-              console.error('Error executing fallback agent:', err.message);
+        // Try all available agents
+        const availableAgents = agentManager.getAvailableAgents();
+        const remainingAgents = availableAgents.filter(a => a.name !== agent.name);
+        
+        if (remainingAgents.length > 0) {
+          console.error(`Retrying with ${remainingAgents.length} alternative agents...`);
+          
+          // Try each remaining agent until one succeeds
+          let agentIndex = 0;
+          const tryNextAgent = () => {
+            if (agentIndex >= remainingAgents.length) {
+              console.error('All alternative agents failed');
               process.exit(1);
-            });
+              return;
+            }
+            
+            const nextAgent = remainingAgents[agentIndex];
+            agentIndex++;
+            
+            console.error(`Retrying with agent: ${nextAgent.name}`);
+            
+            AgentWrapper.executeAgentCommand(nextAgent, argv.prompt, historyManager.readHistory(), globalTimeout)
+              .then(retryResult => {
+                const isRetryOutputEmpty = !retryResult.stdout || retryResult.stdout.trim() === '';
+                if (retryResult.exitCode === 0 && !isRetryOutputEmpty) {
+                  // Success
+                  console.log(retryResult.stdout);
+                  // Add to history
+                  historyManager.writeHistory({
+                    sender: 'user',
+                    text: argv.prompt,
+                    timestamp: new Date().toISOString()
+                  });
+                  historyManager.writeHistory({
+                    sender: 'agent',
+                    text: retryResult.stdout,
+                    timestamp: new Date().toISOString()
+                  });
+                  process.exit(0);
+                } else {
+                  // This agent also failed, try the next one
+                  if (isRetryOutputEmpty) {
+                    console.error(`Agent ${nextAgent.name} failed: Empty response received`);
+                  } else {
+                    console.error(`Agent ${nextAgent.name} failed with exit code ${retryResult.exitCode}`);
+                    if (retryResult.stderr) {
+                      console.error('Error output:', retryResult.stderr);
+                    }
+                  }
+                  agentManager.markAgentAsFailed(nextAgent.name);
+                  tryNextAgent(); // Try next agent
+                }
+              })
+              .catch(err => {
+                console.error(`Error with agent ${nextAgent.name}:`, err.message);
+                agentManager.markAgentAsFailed(nextAgent.name);
+                tryNextAgent(); // Try next agent
+              });
+          };
+          
+          tryNextAgent(); // Start trying remaining agents
         } else {
+          console.error('No alternative agents available');
           process.exit(1);
         }
       });
@@ -293,6 +385,16 @@ if (argv.continue && loadedHistory.length > 0) {
       historyContent += `{bold}You:{/bold} ${entry.text}\n`;
     } else if (entry.sender === 'agent') {
       historyContent += `${entry.text}\n`;
+    } else if (entry.sender === 'agent-announcement') {
+      // Display agent announcements with color coding
+      const agentMatch = entry.text.match(/Agent \(([^)]+)\):/);
+      if (agentMatch) {
+        const agentName = agentMatch[1];
+        const color = getAgentColor(agentName);
+        historyContent += `{bold}{${color}-fg}${entry.text}{/${color}-fg}{/bold}\n`;
+      } else {
+        historyContent += `{bold}${entry.text}{/bold}\n`;
+      }
     } else if (entry.sender === 'system') {
       historyContent += `${entry.text}\n`;
     } else if (entry.sender === 'shell') {
@@ -484,7 +586,16 @@ async function handleSlashCommand(text) {
           try {
             chatUI.addMessage(`Initializing ${agent.name}...`, 'system');
             chatUI.getScreen().render();
-            await AgentWrapper.executeAgentCommand(agent, '/init', [], globalTimeout);
+            const result = await AgentWrapper.executeAgentCommand(agent, '/init', [], globalTimeout);
+            // Check if initialization failed due to empty response
+            const isOutputEmpty = !result.stdout || result.stdout.trim() === '';
+            if (result.exitCode !== 0 || isOutputEmpty) {
+              if (isOutputEmpty) {
+                chatUI.addMessage(`Warning: ${agent.name} initialization failed: Empty response received`, 'system');
+              } else {
+                chatUI.addMessage(`Warning: ${agent.name} initialization failed with exit code ${result.exitCode}`, 'system');
+              }
+            }
             // Discard the response - agents handle their own initialization
           } catch (error) {
             chatUI.addMessage(`Warning: ${agent.name} initialization failed: ${error.message}`, 'system');
@@ -786,6 +897,13 @@ chatUI.getInputBox().on('submit', async (text) => {
       const color = getAgentColor(agent.name);
       chatUI.addMessage(`{bold}{${color}-fg}Agent (${agent.name}):{/${color}-fg}{/bold}`, 'system');
       
+      // Write agent announcement to history
+      historyManager.writeHistory({
+        sender: 'agent-announcement',
+        text: `Agent (${agent.name}):`,
+        timestamp: new Date().toISOString()
+      });
+      
       // Track that we added 2 messages (user + agent announcement) for cancellation
       const messagesToRevert = 2;
       
@@ -842,37 +960,87 @@ chatUI.getInputBox().on('submit', async (text) => {
         
         const result = await AgentWrapper.executeAgentCommand(agent, text, history, globalTimeout);
         
-        // Check if agent failed (non-zero exit code)
-        if (result.exitCode !== 0) {
+        // Check if agent failed (non-zero exit code or empty output)
+        const isOutputEmpty = !result.stdout || result.stdout.trim() === '';
+        if (result.exitCode !== 0 || isOutputEmpty) {
           // Exit code 137 means SIGKILL (128 + 9)
           // Don't show anything for cancellation - already handled by ESC handler
           if (result.exitCode === 137 || result.exitCode === null) {
             // Cancelled - do nothing, ESC handler already cleaned up
           } else {
-            chatUI.addMessage(`Agent ${agent.name} failed with exit code ${result.exitCode}`, 'system');
-            if (result.stderr) {
-              chatUI.addMessage(`Error: ${result.stderr}`, 'system');
+            if (isOutputEmpty) {
+              chatUI.addMessage(`Agent ${agent.name} failed: Empty response received`, 'system');
+            } else {
+              chatUI.addMessage(`Agent ${agent.name} failed with exit code ${result.exitCode}`, 'system');
+              if (result.stderr) {
+                chatUI.addMessage(`Error: ${result.stderr}`, 'system');
+              }
             }
             agentManager.markAgentAsFailed(agent.name);
           
-            // Try next agent
-            const nextAgent = agentManager.getNextAgent();
-            if (nextAgent && nextAgent.name !== agent.name) {
-              const color = getAgentColor(nextAgent.name);
-              chatUI.addMessage(`{bold}{${color}-fg}Agent (${nextAgent.name}):{/${color}-fg}{/bold}`, 'system');
-              configManager.propagateInstructions();
-              const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
-              if (retryResult.exitCode === 0) {
-                chatUI.addMessage(retryResult.stdout, 'agent');
-                // Add agent response to history
+            // Try all available agents
+            const availableAgents = agentManager.getAvailableAgents();
+            const remainingAgents = availableAgents.filter(a => a.name !== agent.name);
+            
+            if (remainingAgents.length > 0) {
+              // Try each remaining agent until one succeeds
+              let agentIndex = 0;
+              const tryNextAgent = async () => {
+                if (agentIndex >= remainingAgents.length) {
+                  chatUI.addMessage('All alternative agents failed', 'system');
+                  return false;
+                }
+                
+                const nextAgent = remainingAgents[agentIndex];
+                agentIndex++;
+                
+                const color = getAgentColor(nextAgent.name);
+                chatUI.addMessage(`{bold}{${color}-fg}Agent (${nextAgent.name}):{/${color}-fg}{/bold}`, 'system');
+                
+                // Write agent announcement to history
                 historyManager.writeHistory({
-                  sender: 'agent',
-                  text: retryResult.stdout,
+                  sender: 'agent-announcement',
+                  text: `Agent (${nextAgent.name}):`,
                   timestamp: new Date().toISOString()
                 });
-              } else {
-                chatUI.addMessage(`Agent ${nextAgent.name} also failed`, 'system');
-              }
+                
+                configManager.propagateInstructions();
+                
+                try {
+                  const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
+                  const isRetryOutputEmpty = !retryResult.stdout || retryResult.stdout.trim() === '';
+                  
+                  if (retryResult.exitCode === 0 && !isRetryOutputEmpty) {
+                    // Success
+                    chatUI.addMessage(retryResult.stdout, 'agent');
+                    // Add agent response to history
+                    historyManager.writeHistory({
+                      sender: 'agent',
+                      text: retryResult.stdout,
+                      timestamp: new Date().toISOString()
+                    });
+                    return true;
+                  } else {
+                    // This agent also failed, try the next one
+                    if (isRetryOutputEmpty) {
+                      chatUI.addMessage(`Agent ${nextAgent.name} failed: Empty response received`, 'system');
+                    } else {
+                      chatUI.addMessage(`Agent ${nextAgent.name} failed with exit code ${retryResult.exitCode}`, 'system');
+                      if (retryResult.stderr) {
+                        chatUI.addMessage(`Error: ${retryResult.stderr}`, 'system');
+                      }
+                    }
+                    agentManager.markAgentAsFailed(nextAgent.name);
+                    return await tryNextAgent(); // Try next agent
+                  }
+                } catch (retryError) {
+                  chatUI.addMessage(`Error with agent ${nextAgent.name}: ${retryError.message}`, 'system');
+                  agentManager.markAgentAsFailed(nextAgent.name);
+                  return await tryNextAgent(); // Try next agent
+                }
+              };
+              
+              await tryNextAgent(); // Start trying remaining agents
             } else {
               chatUI.addMessage('No alternative agents available', 'system');
             }
@@ -895,29 +1063,69 @@ chatUI.getInputBox().on('submit', async (text) => {
           chatUI.addMessage(`Error executing agent: ${error.message}`, 'system');
           agentManager.markAgentAsFailed(agent.name);
         
-          // Try next agent
-          const nextAgent = agentManager.getNextAgent();
-          if (nextAgent && nextAgent.name !== agent.name) {
-            const color = getAgentColor(nextAgent.name);
-            chatUI.addMessage(`{bold}{${color}-fg}Agent (${nextAgent.name}):{/${color}-fg}{/bold}`, 'system');
-            try {
-              const history = historyManager.readHistory();
-              configManager.propagateInstructions();
-              const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
-              if (retryResult.exitCode === 0) {
-                chatUI.addMessage(retryResult.stdout, 'agent');
-                // Add agent response to history
-                historyManager.writeHistory({
-                  sender: 'agent',
-                  text: retryResult.stdout,
-                  timestamp: new Date().toISOString()
-                });
-              } else {
-                chatUI.addMessage(`Agent ${nextAgent.name} also failed`, 'system');
+          // Try all available agents
+          const availableAgents = agentManager.getAvailableAgents();
+          const remainingAgents = availableAgents.filter(a => a.name !== agent.name);
+          
+          if (remainingAgents.length > 0) {
+            // Try each remaining agent until one succeeds
+            let agentIndex = 0;
+            const tryNextAgent = async () => {
+              if (agentIndex >= remainingAgents.length) {
+                chatUI.addMessage('All alternative agents failed', 'system');
+                return false;
               }
-            } catch (retryError) {
-              chatUI.addMessage(`Fallback agent error: ${retryError.message}`, 'system');
-            }
+              
+              const nextAgent = remainingAgents[agentIndex];
+              agentIndex++;
+              
+              const color = getAgentColor(nextAgent.name);
+              chatUI.addMessage(`{bold}{${color}-fg}Agent (${nextAgent.name}):{/${color}-fg}{/bold}`, 'system');
+              
+              // Write agent announcement to history
+              historyManager.writeHistory({
+                sender: 'agent-announcement',
+                text: `Agent (${nextAgent.name}):`,
+                timestamp: new Date().toISOString()
+              });
+              
+              try {
+                const history = historyManager.readHistory();
+                configManager.propagateInstructions();
+                const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
+                const isRetryOutputEmpty = !retryResult.stdout || retryResult.stdout.trim() === '';
+                
+                if (retryResult.exitCode === 0 && !isRetryOutputEmpty) {
+                  // Success
+                  chatUI.addMessage(retryResult.stdout, 'agent');
+                  // Add agent response to history
+                  historyManager.writeHistory({
+                    sender: 'agent',
+                    text: retryResult.stdout,
+                    timestamp: new Date().toISOString()
+                  });
+                  return true;
+                } else {
+                  // This agent also failed, try the next one
+                  if (isRetryOutputEmpty) {
+                    chatUI.addMessage(`Agent ${nextAgent.name} failed: Empty response received`, 'system');
+                  } else {
+                    chatUI.addMessage(`Agent ${nextAgent.name} failed with exit code ${retryResult.exitCode}`, 'system');
+                    if (retryResult.stderr) {
+                      chatUI.addMessage(`Error: ${retryResult.stderr}`, 'system');
+                    }
+                  }
+                  agentManager.markAgentAsFailed(nextAgent.name);
+                  return await tryNextAgent(); // Try next agent
+                }
+              } catch (retryError) {
+                chatUI.addMessage(`Error with agent ${nextAgent.name}: ${retryError.message}`, 'system');
+                agentManager.markAgentAsFailed(nextAgent.name);
+                return await tryNextAgent(); // Try next agent
+              }
+            };
+            
+            await tryNextAgent(); // Start trying remaining agents
           } else {
             chatUI.addMessage('No alternative agents available', 'system');
           }

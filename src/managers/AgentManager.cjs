@@ -106,6 +106,7 @@ class AgentManager {
   getNextAgentRoundRobin(availableAgents) {
     // Round-robin: Rotate through all agents in order
     // Keep incrementing until we find an available agent
+    // Note: This modifies this.currentAgentIndex which affects the starting point for next call
     for (let i = 0; i < this.agents.length; i++) {
       const index = (this.currentAgentIndex + i) % this.agents.length;
       const agent = this.agents[index];
@@ -133,6 +134,7 @@ class AgentManager {
   getNextAgentExhaustion(availableAgents) {
     // Exhaustion strategy: Always try agents in priority order (list order)
     // Try the first available agent in the original list order
+    // Unlike round-robin, we always start from the beginning of the list
     for (let i = 0; i < this.agents.length; i++) {
       const agent = this.agents[i];
       const availableAgent = availableAgents.find(a => a.name === agent.name);
@@ -224,6 +226,11 @@ class AgentManager {
    * @param {string} strategy - The new rotation strategy
    */
   updateRotationStrategy(strategy) {
+    // Handle backward compatibility for old "exhaust" value
+    if (strategy === 'exhaust') {
+      strategy = 'exhaustion';
+    }
+    
     if (['round-robin', 'exhaustion', 'random', 'manual'].includes(strategy)) {
       this.rotationStrategy = strategy;
       this.saveState();
@@ -258,9 +265,19 @@ class AgentManager {
    * @returns {boolean} True if strategy was valid and set
    */
   setStrategy(strategy) {
+    // Handle backward compatibility for old "exhaust" value
+    if (strategy === 'exhaust') {
+      strategy = 'exhaustion';
+    }
+    
     if (['round-robin', 'exhaustion', 'random', 'manual'].includes(strategy)) {
       this.rotationStrategy = strategy;
       this.saveState();
+      
+      // Also update the config file
+      this.configManager.config.rotationStrategy = strategy;
+      this.configManager.saveConfig();
+      
       return true;
     }
     return false;
@@ -313,6 +330,14 @@ class AgentManager {
    */
   getAgents() {
     return this.agents;
+  }
+
+  /**
+   * Get all available agents (not in cooldown)
+   * @returns {array} The list of available agents
+   */
+  getAvailableAgents() {
+    return this.agents.filter(agent => !this.isAgentInCooldown(agent.name));
   }
 }
 

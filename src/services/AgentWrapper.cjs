@@ -65,6 +65,12 @@ class AgentWrapper {
       process.on('close', (code) => {
         if (timeoutId) clearTimeout(timeoutId);
         this.currentProcess = null;  // Clear the tracked process
+        
+        // Treat empty stdout as a failure even if exit code is 0
+        if (code === 0 && (!stdout || stdout.trim() === '')) {
+          code = 1; // Set exit code to 1 to indicate failure
+        }
+        
         resolve({ stdout, stderr, exitCode: code });
       });
       

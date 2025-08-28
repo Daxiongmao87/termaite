@@ -698,6 +698,13 @@ class WebServer {
       message: `Agent (${agent.name}):`
     });
     
+    // Write agent announcement to history
+    this.historyManager.writeHistory({
+      sender: 'agent-announcement',
+      text: `Agent (${agent.name}):`,
+      timestamp: new Date().toISOString()
+    });
+    
     this.agentIsRunning = true;
     
     try {
@@ -729,22 +736,64 @@ class WebServer {
         
         this.agentManager.markAgentAsFailed(agent.name);
         
-        // Try next agent
-        const nextAgent = this.agentManager.getNextAgent();
-        if (nextAgent && nextAgent.name !== agent.name) {
-          const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
-          if (retryResult.exitCode === 0) {
+        // Try all available agents
+        const availableAgents = this.agentManager.getAvailableAgents();
+        const remainingAgents = availableAgents.filter(a => a.name !== agent.name);
+        
+        if (remainingAgents.length > 0) {
+          // Try each remaining agent until one succeeds
+          let agentIndex = 0;
+          const tryNextAgent = async () => {
+            if (agentIndex >= remainingAgents.length) {
+              this.sendWebSocketMessage(clientId, {
+                type: 'error',
+                message: 'All alternative agents failed'
+              });
+              return false;
+            }
+            
+            const nextAgent = remainingAgents[agentIndex];
+            agentIndex++;
+            
+            // Send agent announcement for retry
             this.sendWebSocketMessage(clientId, {
-              type: 'agent',
-              message: retryResult.stdout
+              type: 'agent_start',
+              agent: nextAgent.name,
+              message: `Agent (${nextAgent.name}):`
             });
             
+            // Write agent announcement to history
             this.historyManager.writeHistory({
-              sender: 'agent',
-              text: retryResult.stdout,
+              sender: 'agent-announcement',
+              text: `Agent (${nextAgent.name}):`,
               timestamp: new Date().toISOString()
             });
-          }
+            
+            try {
+              const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
+              if (retryResult.exitCode === 0) {
+                this.sendWebSocketMessage(clientId, {
+                  type: 'agent',
+                  message: retryResult.stdout
+                });
+                
+                this.historyManager.writeHistory({
+                  sender: 'agent',
+                  text: retryResult.stdout,
+                  timestamp: new Date().toISOString()
+                });
+                return true;
+              } else {
+                this.agentManager.markAgentAsFailed(nextAgent.name);
+                return await tryNextAgent(); // Try next agent
+              }
+            } catch (retryError) {
+              this.agentManager.markAgentAsFailed(nextAgent.name);
+              return await tryNextAgent(); // Try next agent
+            }
+          };
+          
+          await tryNextAgent(); // Start trying remaining agents
         }
       }
     } catch (error) {
@@ -1969,6 +2018,9 @@ input:focus {
                 break;
             case 'agent':
                 this.addMessage(entry.text, 'agent');
+                break;
+            case 'agent-announcement':
+                this.addMessage(entry.text, 'agent-start');
                 break;
             case 'system':
                 this.addMessage(entry.text, 'system');

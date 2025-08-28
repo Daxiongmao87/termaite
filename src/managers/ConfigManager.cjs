@@ -147,7 +147,17 @@ class ConfigManager {
    * @returns {string} The rotation strategy
    */
   getRotationStrategy() {
-    return this.config.rotationStrategy || 'round-robin';
+    const strategy = this.config.rotationStrategy || 'round-robin';
+    
+    // Handle backward compatibility for old "exhaust" value
+    if (strategy === 'exhaust') {
+      // Update the config file to use the correct value
+      this.config.rotationStrategy = 'exhaustion';
+      this.saveConfig();
+      return 'exhaustion';
+    }
+    
+    return strategy;
   }
 
   /**
