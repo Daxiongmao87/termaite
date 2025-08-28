@@ -459,7 +459,8 @@ async function handleSlashCommand(text) {
       if (agent) {
         try {
           const stats = await historyCompactor.manualCompactHistory(agent);
-          chatUI.addMessage(`History compacted successfully: ${stats.entriesSummarized} entries → 1 summary (${stats.tokensSaved} tokens saved)`, 'system');
+          const method = stats.method === 'fallback_truncation' ? ' (fallback method)' : '';
+          chatUI.addMessage(`History compacted successfully${method}: ${stats.entriesSummarized} entries → 1 summary (${stats.tokensSaved} tokens saved)`, 'system');
         } catch (error) {
           chatUI.addMessage(`Error compacting history: ${error.message}`, 'system');
         }
@@ -970,10 +971,17 @@ chatUI.getInputBox().on('submit', async (text) => {
           
           try {
             const stats = await historyCompactor.compactHistory(agent);
-            chatUI.addMessage(`History auto-compacted: ${stats.entriesSummarized} entries (${stats.tokensSaved} tokens saved)`, 'system');
+            const method = stats.method === 'fallback_truncation' ? ' (fallback method)' : '';
+            chatUI.addMessage(`History auto-compacted${method}: ${stats.entriesSummarized} entries (${stats.tokensSaved} tokens saved)`, 'system');
           } catch (error) {
-            chatUI.addMessage(`Warning: Auto-compaction failed: ${error.message}`, 'system');
-            // Continue with message processing even if compaction fails
+            chatUI.addMessage(`Warning: Auto-compaction failed, attempting fallback: ${error.message}`, 'system');
+            try {
+              const fallbackStats = historyCompactor.fallbackCompactHistory(0.5);
+              chatUI.addMessage(`Fallback compaction completed: ${fallbackStats.entriesSummarized} entries removed (${fallbackStats.tokensSaved} tokens saved)`, 'system');
+            } catch (fallbackError) {
+              chatUI.addMessage(`Critical: Both AI and fallback compaction failed: ${fallbackError.message}`, 'system');
+              // Continue with message processing even if all compaction fails
+            }
           }
           chatUI.getScreen().render();
         }

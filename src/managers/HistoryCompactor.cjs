@@ -49,12 +49,27 @@ class HistoryCompactor {
   /**
    * Compact the chat history by summarizing the oldest 50% by token count
    * @param {object} agent - The agent to use for summarization
-   * @returns {Promise<void>}
+   * @returns {Promise<object>} Compaction statistics
    */
   async compactHistory(agent) {
+    // Validate agent parameter
+    if (!agent) {
+      throw new Error('Agent is required for history compaction');
+    }
+    
+    if (!agent.command) {
+      throw new Error('Agent command is required for history compaction');
+    }
+
     const history = this.historyManager.readHistory();
     if (history.length === 0) {
-      return;
+      return {
+        entriesSummarized: 0,
+        entriesKept: 0,
+        tokensBeforeCompaction: 0,
+        tokensAfterCompaction: 0,
+        tokensSaved: 0
+      };
     }
     
     // Calculate total token count
@@ -89,9 +104,18 @@ class HistoryCompactor {
     const tokensToSummarize = historyToSummarize.reduce((total, entry) => total + estimateTokenCount(entry.text), 0);
     const tokensToKeep = historyToKeep.reduce((total, entry) => total + estimateTokenCount(entry.text), 0);
     
-    // Request a summary from the agent
+    // Request a summary from the agent with enhanced error handling
     try {
       const result = await AgentWrapper.executeAgentCommand(agent, `Please summarize the following chat history as a concise bullet-point list of critical details:\n\n${historyString}`, [], this.globalTimeout);
+      
+      // Validate the AI response
+      if (!result.stdout || result.stdout.trim() === '') {
+        throw new Error(`AI agent returned empty response for summarization (exit code: ${result.exitCode})`);
+      }
+      
+      if (result.exitCode !== 0) {
+        throw new Error(`AI agent failed with exit code ${result.exitCode}: ${result.stderr || 'No error details available'}`);
+      }
       
       // Create a new entry for the summary
       const summaryTokens = estimateTokenCount(result.stdout);
@@ -101,13 +125,17 @@ class HistoryCompactor {
         timestamp: new Date().toISOString()
       };
       
-      // Write the new history
-      // Clear the existing history file
-      this.historyManager.clearHistory();
-      
-      // Write the summary entry and the remaining history
-      this.historyManager.writeHistory(summaryEntry);
-      historyToKeep.forEach(entry => this.historyManager.writeHistory(entry));
+      // Write the new history with error handling
+      try {
+        // Clear the existing history file
+        this.historyManager.clearHistory();
+        
+        // Write the summary entry and the remaining history
+        this.historyManager.writeHistory(summaryEntry);
+        historyToKeep.forEach(entry => this.historyManager.writeHistory(entry));
+      } catch (fileError) {
+        throw new Error(`Failed to write compacted history to file: ${fileError.message}`);
+      }
       
       // Return compaction stats for user feedback
       return {
@@ -118,19 +146,117 @@ class HistoryCompactor {
         tokensSaved: tokensToSummarize - summaryTokens
       };
     } catch (error) {
-      console.error('Error summarizing history:', error);
-      throw error;
+      // Enhanced error logging with context
+      console.error('Error in history compaction:', {
+        error: error.message,
+        agent: agent.name || 'unknown',
+        command: agent.command,
+        entriesToSummarize: historyToSummarize.length,
+        totalTokens: totalTokens,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Re-throw with more descriptive error message
+      if (error.message.includes('timed out')) {
+        throw new Error(`History compaction timed out after ${this.globalTimeout || agent.timeoutSeconds || 300} seconds. The AI agent may be unresponsive.`);
+      } else if (error.message.includes('Agent command')) {
+        throw new Error(`AI agent execution failed: ${error.message}`);
+      } else if (error.message.includes('Failed to write')) {
+        throw new Error(`File system error during compaction: ${error.message}`);
+      } else {
+        throw new Error(`History compaction failed: ${error.message}`);
+      }
     }
   }
   
   /**
+   * Fallback compaction method that truncates history without AI summarization
+   * This is used when AI summarization fails completely
+   * @param {number} keepPercentage - Percentage of history to keep (default: 50%)
+   * @returns {object} Compaction statistics
+   */
+  fallbackCompactHistory(keepPercentage = 0.5) {
+    const history = this.historyManager.readHistory();
+    if (history.length === 0) {
+      return {
+        entriesSummarized: 0,
+        entriesKept: 0,
+        tokensBeforeCompaction: 0,
+        tokensAfterCompaction: 0,
+        tokensSaved: 0,
+        method: 'fallback_truncation'
+      };
+    }
+    
+    // Calculate total token count
+    const totalTokens = history.reduce((total, entry) => {
+      return total + estimateTokenCount(entry.text);
+    }, 0);
+    
+    // Find split point where we keep the specified percentage
+    const targetTokens = Math.floor(totalTokens * keepPercentage);
+    let cumulativeTokens = 0;
+    let splitIndex = history.length;
+    
+    // Work backwards from the end to find where to keep from
+    for (let i = history.length - 1; i >= 0; i--) {
+      cumulativeTokens += estimateTokenCount(history[i].text);
+      if (cumulativeTokens >= targetTokens) {
+        splitIndex = i;
+        break;
+      }
+    }
+    
+    // Ensure we always keep at least 1 entry
+    splitIndex = Math.max(1, splitIndex);
+    
+    const historyToKeep = history.slice(splitIndex);
+    const historyToRemove = history.slice(0, splitIndex);
+    
+    // Calculate token counts
+    const tokensToKeep = historyToKeep.reduce((total, entry) => total + estimateTokenCount(entry.text), 0);
+    const tokensToRemove = historyToRemove.reduce((total, entry) => total + estimateTokenCount(entry.text), 0);
+    
+    // Create a simple summary entry
+    const summaryEntry = {
+      sender: 'system',
+      text: `[Fallback Compaction] Removed ${historyToRemove.length} older entries (${tokensToRemove} tokens) due to AI summarization failure. Kept ${historyToKeep.length} recent entries.`,
+      timestamp: new Date().toISOString()
+    };
+    
+    try {
+      // Clear the existing history file
+      this.historyManager.clearHistory();
+      
+      // Write the summary entry and the remaining history
+      this.historyManager.writeHistory(summaryEntry);
+      historyToKeep.forEach(entry => this.historyManager.writeHistory(entry));
+    } catch (fileError) {
+      throw new Error(`Failed to write fallback compacted history to file: ${fileError.message}`);
+    }
+    
+    return {
+      entriesSummarized: historyToRemove.length,
+      entriesKept: historyToKeep.length,
+      tokensBeforeCompaction: totalTokens,
+      tokensAfterCompaction: estimateTokenCount(summaryEntry.text) + tokensToKeep,
+      tokensSaved: tokensToRemove - estimateTokenCount(summaryEntry.text),
+      method: 'fallback_truncation'
+    };
+  }
+
+  /**
    * Manually compact the chat history by summarizing the oldest 50%
    * @param {object} agent - The agent to use for summarization
-   * @returns {Promise<void>}
+   * @returns {Promise<object>} Compaction statistics
    */
   async manualCompactHistory(agent) {
-    // This is essentially the same as compactHistory, but we might want to add specific logic for manual compaction
-    return this.compactHistory(agent);
+    try {
+      return await this.compactHistory(agent);
+    } catch (error) {
+      console.error('Manual compaction failed, attempting fallback:', error.message);
+      return this.fallbackCompactHistory(0.5);
+    }
   }
 }
 

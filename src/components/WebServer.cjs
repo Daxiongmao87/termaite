@@ -678,15 +678,28 @@ class WebServer {
       
       try {
         const stats = await this.historyCompactor.compactHistory(agent);
+        const method = stats.method === 'fallback_truncation' ? ' (fallback method)' : '';
         this.sendWebSocketMessage(clientId, {
           type: 'system',
-          message: `History auto-compacted: ${stats.entriesSummarized} entries (${stats.tokensSaved} tokens saved)`
+          message: `History auto-compacted${method}: ${stats.entriesSummarized} entries (${stats.tokensSaved} tokens saved)`
         });
       } catch (error) {
         this.sendWebSocketMessage(clientId, {
           type: 'system',
-          message: `Warning: Auto-compaction failed: ${error.message}`
+          message: `Warning: Auto-compaction failed, attempting fallback: ${error.message}`
         });
+        try {
+          const fallbackStats = this.historyCompactor.fallbackCompactHistory(0.5);
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: `Fallback compaction completed: ${fallbackStats.entriesSummarized} entries removed (${fallbackStats.tokensSaved} tokens saved)`
+          });
+        } catch (fallbackError) {
+          this.sendWebSocketMessage(clientId, {
+            type: 'system',
+            message: `Critical: Both AI and fallback compaction failed: ${fallbackError.message}`
+          });
+        }
         // Continue with message processing even if compaction fails
       }
     }
@@ -1070,9 +1083,10 @@ class WebServer {
         if (agent) {
           try {
             const stats = await this.historyCompactor.manualCompactHistory(agent);
+            const method = stats.method === 'fallback_truncation' ? ' (fallback method)' : '';
             this.sendWebSocketMessage(clientId, {
               type: 'system',
-              message: `History compacted successfully: ${stats.entriesSummarized} entries → 1 summary (${stats.tokensSaved} tokens saved)`
+              message: `History compacted successfully${method}: ${stats.entriesSummarized} entries → 1 summary (${stats.tokensSaved} tokens saved)`
             });
           } catch (error) {
             this.sendWebSocketMessage(clientId, {
