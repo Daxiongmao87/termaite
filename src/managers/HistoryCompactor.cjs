@@ -116,6 +116,9 @@ class HistoryCompactor {
       if (result.exitCode !== 0) {
         throw new Error(`AI agent failed with exit code ${result.exitCode}: ${result.stderr || 'No error details available'}`);
       }
+
+      // Mark agent as used for timeout buffer tracking
+      this.agentManager.markAgentAsUsed(agent.name);
       
       // Create a new entry for the summary
       const summaryTokens = estimateTokenCount(result.stdout);

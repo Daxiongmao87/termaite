@@ -5,14 +5,16 @@ const os = require('os');
 class AgentManager {
   constructor(configManager) {
     this.configManager = configManager;
-    this.agents = configManager.getAgents();
+    this.agents = configManager.getEnabledAgents(); // Only load enabled agents
     this.rotationStrategy = configManager.getRotationStrategy();
+    this.globalTimeoutBuffer = configManager.getTimeoutBuffer(); // Get global timeout buffer in milliseconds
     this.statePath = path.join(os.homedir(), '.termaite', 'state.json');
     const state = this.loadState();
     this.currentAgentIndex = state.currentAgentIndex;
     this.selectedAgent = state.selectedAgent; // For manual mode
     this.temporaryAgent = null; // For one-time selection overrides
     this.failedAgents = new Map(); // Map to track failed agents and their cooldown periods
+    this.lastUsedAgents = new Map(); // Map to track when agents were last used (for timeout buffer)
   }
   
   /**
@@ -68,17 +70,19 @@ class AgentManager {
     if (this.temporaryAgent) {
       const tempAgent = this.agents.find(agent => agent.name === this.temporaryAgent);
       this.temporaryAgent = null; // Clear after use
-      if (tempAgent && !this.isAgentInCooldown(tempAgent.name)) {
+      if (tempAgent && !this.isAgentInCooldown(tempAgent.name) && !this.isAgentInTimeoutBuffer(tempAgent.name)) {
         return tempAgent;
       }
-      // If temporary agent is in cooldown, fall through to normal logic
+      // If temporary agent is in cooldown or timeout buffer, fall through to normal logic
     }
 
-    // Filter out agents that are currently in cooldown
-    const availableAgents = this.agents.filter(agent => !this.isAgentInCooldown(agent.name));
+    // Filter out agents that are currently in cooldown or timeout buffer
+    const availableAgents = this.agents.filter(agent => 
+      !this.isAgentInCooldown(agent.name) && !this.isAgentInTimeoutBuffer(agent.name)
+    );
     
     if (availableAgents.length === 0) {
-      // If all agents are in cooldown, we need to honor the adaptive retry mechanism
+      // If all agents are in cooldown or timeout buffer, we need to honor the adaptive retry mechanism
       // by selecting the agent with the lowest failure count
       let lowestFailureCount = Infinity;
       let selectedAgent = this.agents[0]; // fallback to first agent
@@ -241,6 +245,74 @@ class AgentManager {
   }
 
   /**
+   * Get the timeout buffer for a specific agent (supports both global and per-agent timeout buffers)
+   * @param {string} agentName - The name of the agent
+   * @returns {number} Timeout buffer in milliseconds
+   */
+  getAgentTimeoutBuffer(agentName) {
+    // First check if the agent has a specific timeout buffer
+    const agent = this.agents.find(a => a.name === agentName);
+    if (agent && agent.timeoutBuffer) {
+      return this.configManager.parseTimeoutBuffer(agent.timeoutBuffer);
+    }
+    
+    // Fall back to global timeout buffer
+    return this.globalTimeoutBuffer;
+  }
+
+  /**
+   * Mark an agent as used (for timeout buffer tracking)
+   * @param {string} agentName - The name of the agent that was used
+   */
+  markAgentAsUsed(agentName) {
+    const timeoutBuffer = this.getAgentTimeoutBuffer(agentName);
+    if (timeoutBuffer > 0) {
+      this.lastUsedAgents.set(agentName, Date.now());
+    }
+  }
+
+  /**
+   * Check if an agent is in timeout buffer (recently used)
+   * @param {string} agentName - The name of the agent
+   * @returns {boolean} True if the agent is in timeout buffer, false otherwise
+   */
+  isAgentInTimeoutBuffer(agentName) {
+    const timeoutBuffer = this.getAgentTimeoutBuffer(agentName);
+    if (timeoutBuffer <= 0) {
+      return false; // No timeout buffer configured
+    }
+
+    const lastUsed = this.lastUsedAgents.get(agentName);
+    if (!lastUsed) {
+      return false; // Agent has never been used
+    }
+
+    const timeSinceLastUse = Date.now() - lastUsed;
+    return timeSinceLastUse < timeoutBuffer;
+  }
+
+  /**
+   * Get the remaining timeout buffer time for an agent
+   * @param {string} agentName - The name of the agent
+   * @returns {number} Remaining timeout buffer time in milliseconds, or 0 if not in timeout
+   */
+  getRemainingTimeoutBuffer(agentName) {
+    const timeoutBuffer = this.getAgentTimeoutBuffer(agentName);
+    if (timeoutBuffer <= 0) {
+      return 0;
+    }
+
+    const lastUsed = this.lastUsedAgents.get(agentName);
+    if (!lastUsed) {
+      return 0;
+    }
+
+    const timeSinceLastUse = Date.now() - lastUsed;
+    const remaining = timeoutBuffer - timeSinceLastUse;
+    return Math.max(0, remaining);
+  }
+
+  /**
    * Update the rotation strategy
    * @param {string} strategy - The new rotation strategy
    */
@@ -320,20 +392,36 @@ class AgentManager {
 
   /**
    * Get agent status information
-   * @returns {object} Status information for all agents
+   * @returns {object} Status information for all agents (including disabled ones)
    */
   getAgentStatus() {
+    // Get all agents (enabled and disabled) for status display
+    const allAgents = this.configManager.getAgents();
+    
     return {
       strategy: this.rotationStrategy,
       selectedAgent: this.selectedAgent,
       temporaryAgent: this.temporaryAgent,
-      agents: this.agents.map(agent => ({
+      globalTimeoutBuffer: this.globalTimeoutBuffer,
+      agents: allAgents.map(agent => ({
         name: agent.name,
-        available: !this.isAgentInCooldown(agent.name),
+        enabled: agent.enabled !== false, // Default to true if not specified
+        available: agent.enabled !== false && !this.isAgentInCooldown(agent.name) && !this.isAgentInTimeoutBuffer(agent.name),
         failureCount: this.failedAgents.get(agent.name)?.failureCount || 0,
-        cooldownUntil: this.failedAgents.get(agent.name)?.cooldownUntil || null
+        cooldownUntil: this.failedAgents.get(agent.name)?.cooldownUntil || null,
+        inTimeoutBuffer: this.isAgentInTimeoutBuffer(agent.name),
+        remainingTimeoutBuffer: this.getRemainingTimeoutBuffer(agent.name),
+        timeoutBuffer: this.getAgentTimeoutBuffer(agent.name)
       }))
     };
+  }
+
+  /**
+   * Refresh the agents list from configuration
+   * This should be called when the configuration changes
+   */
+  refreshAgents() {
+    this.agents = this.configManager.getEnabledAgents();
   }
 
   /**
@@ -353,11 +441,13 @@ class AgentManager {
   }
 
   /**
-   * Get all available agents (not in cooldown)
+   * Get all available agents (not in cooldown or timeout buffer)
    * @returns {array} The list of available agents
    */
   getAvailableAgents() {
-    return this.agents.filter(agent => !this.isAgentInCooldown(agent.name));
+    return this.agents.filter(agent => 
+      !this.isAgentInCooldown(agent.name) && !this.isAgentInTimeoutBuffer(agent.name)
+    );
   }
 }
 

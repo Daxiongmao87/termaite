@@ -185,6 +185,8 @@ if (argv.prompt) {
                   if (retryResult.exitCode === 0 && !isRetryOutputEmpty) {
                     // Success
                     console.log(retryResult.stdout);
+                    // Mark agent as used for timeout buffer tracking
+                    agentManager.markAgentAsUsed(nextAgent.name);
                     // Add to history
                     historyManager.writeHistory({
                       sender: 'user',
@@ -226,6 +228,8 @@ if (argv.prompt) {
         }
         
         console.log(result.stdout);
+        // Mark agent as used for timeout buffer tracking
+        agentManager.markAgentAsUsed(agent.name);
         // Add to history
         historyManager.writeHistory({
           sender: 'user',
@@ -270,6 +274,8 @@ if (argv.prompt) {
                 if (retryResult.exitCode === 0 && !isRetryOutputEmpty) {
                   // Success
                   console.log(retryResult.stdout);
+                  // Mark agent as used for timeout buffer tracking
+                  agentManager.markAgentAsUsed(nextAgent.name);
                   // Add to history
                   historyManager.writeHistory({
                     sender: 'user',
@@ -366,6 +372,15 @@ if (argv.rotation) {
   agentManager.updateRotationStrategy(argv.rotation);
 }
 
+// Set up config reload listener for agent manager
+configManager.onConfigReload = () => {
+  agentManager.refreshAgents();
+  // Also update globalTimeoutBuffer in agentManager if it changed
+  agentManager.globalTimeoutBuffer = configManager.getTimeoutBuffer();
+  chatUI.addMessage('Configuration reloaded and agents refreshed.', 'system');
+  chatUI.getScreen().render();
+};
+
 // Create the history compactor
 const historyCompactor = new HistoryCompactor(configManager, historyManager);
 
@@ -419,8 +434,19 @@ if (argv.continue && loadedHistory.length > 0) {
 
 // Function to handle slash commands
 async function handleSlashCommand(text) {
-  const command = text.substring(1).split(' ')[0];
-  const args = text.substring(1).split(' ').slice(1);
+  // Parse command arguments, handling spaces in agent names
+  const commandText = text.substring(1);
+  const firstSpace = commandText.indexOf(' ');
+  const command = firstSpace === -1 ? commandText : commandText.substring(0, firstSpace);
+  const argsText = firstSpace === -1 ? '' : commandText.substring(firstSpace + 1);
+  
+  // For select command, treat the entire argument as the agent name (allowing spaces)
+  let args = [];
+  if (command === 'select' && argsText.trim()) {
+    args = [argsText.trim()];
+  } else {
+    args = argsText.split(' ').filter(arg => arg.length > 0);
+  }
   
   switch (command) {
     case 'clear':
@@ -441,7 +467,7 @@ async function handleSlashCommand(text) {
       chatUI.addMessage('/exit - Exit the application', 'system');
       chatUI.addMessage('/help - Show this help message', 'system');
       chatUI.addMessage('/compact - Compact the chat history', 'system');
-      chatUI.addMessage('/select <agent> - Select agent for next prompt (or permanently in manual mode)', 'system');
+      chatUI.addMessage('/select <agent> - Select agent for next prompt (or permanently in manual mode). Agent names can contain spaces.', 'system');
       chatUI.addMessage('/strategy [mode] - Show or set rotation strategy (round-robin, exhaustion, random, manual)', 'system');
       chatUI.addMessage('/agents - Show agent status and current configuration', 'system');
       chatUI.addMessage('/init - Initialize the project', 'system');
@@ -472,23 +498,23 @@ async function handleSlashCommand(text) {
       
     case 'select':
       if (args.length > 0) {
-        const agentName = args[0];
-        const agent = configManager.getAgents().find(a => a.name === agentName);
+        const agentIdentifier = args[0];
+        const agent = configManager.findAgent(agentIdentifier);
         if (agent) {
           // Determine if this is temporary based on strategy
           const isTemporary = agentManager.getStrategy() !== 'manual';
           
-          if (agentManager.selectAgent(agentName, isTemporary)) {
+          if (agentManager.selectAgent(agent.name, isTemporary)) {
             if (isTemporary) {
-              chatUI.addMessage(`Selected ${agentName} for next prompt only`, 'system');
+              chatUI.addMessage(`Selected ${agent.name} for next prompt only`, 'system');
             } else {
-              chatUI.addMessage(`Selected ${agentName} (manual mode)`, 'system');
+              chatUI.addMessage(`Selected ${agent.name} (manual mode)`, 'system');
             }
           } else {
-            chatUI.addMessage(`Agent not found: ${agentName}`, 'system');
+            chatUI.addMessage(`Agent not found: ${agentIdentifier}`, 'system');
           }
         } else {
-          chatUI.addMessage(`Agent not found: ${agentName}`, 'system');
+          chatUI.addMessage(`Agent not found: ${agentIdentifier}`, 'system');
         }
       } else {
         // Fall through to agents case when no argument provided
@@ -509,7 +535,14 @@ async function handleSlashCommand(text) {
         status.agents.forEach(agentStatus => {
           const agent = agents.find(a => a.name === agentStatus.name);
           const color = getAgentColor(agentStatus.name);
-          const statusText = agentStatus.available ? 'available' : 'cooldown';
+          let statusText;
+          if (!agentStatus.enabled) {
+            statusText = 'disabled';
+          } else if (agentStatus.available) {
+            statusText = 'available';
+          } else {
+            statusText = 'cooldown';
+          }
           const contextWindow = agent ? agent.contextWindowTokens.toLocaleString() : 'unknown';
           chatUI.addMessage(`- {bold}{${color}-fg}${agentStatus.name}{/${color}-fg}{/bold}`, 'system');
           chatUI.addMessage(`    status:         ${statusText}`, 'system');
@@ -649,11 +682,7 @@ async function handleSlashCommand(text) {
       // Use blessed's built-in exec method for proper terminal handling
       chatUI.getScreen().exec(editor, [configPath], {}, (err, success) => {
         if (!err) {
-          chatUI.addMessage('Config file closed', 'system');
-          // Reload the config
-          configManager.config = configManager.loadConfig();
-          agentManager.agents = configManager.getAgents();
-          agentManager.rotationStrategy = configManager.getRotationStrategy();
+          chatUI.addMessage('Config file closed. Changes will be applied automatically.', 'system');
         } else {
           chatUI.addMessage(`Editor error: ${err.message}`, 'system');
         }
@@ -788,7 +817,7 @@ async function handleSlashCommand(text) {
       chatUI.addMessage('/exit - Exit the application', 'system');
       chatUI.addMessage('/help - Show this help message', 'system');
       chatUI.addMessage('/compact - Compact the chat history', 'system');
-      chatUI.addMessage('/select <agent> - Select agent for next prompt (or permanently in manual mode)', 'system');
+      chatUI.addMessage('/select <agent> - Select agent for next prompt (or permanently in manual mode). Agent names can contain spaces.', 'system');
       chatUI.addMessage('/strategy [mode] - Show or set rotation strategy (round-robin, exhaustion, random, manual)', 'system');
       chatUI.addMessage('/agents - Show agent status and current configuration', 'system');
       chatUI.addMessage('/init - Initialize the project', 'system');
@@ -1041,6 +1070,8 @@ chatUI.getInputBox().on('submit', async (text) => {
                   if (retryResult.exitCode === 0 && !isRetryOutputEmpty) {
                     // Success
                     chatUI.addMessage(retryResult.stdout, 'agent');
+                    // Mark agent as used for timeout buffer tracking
+                    agentManager.markAgentAsUsed(nextAgent.name);
                     // Add agent response to history
                     historyManager.writeHistory({
                       sender: 'agent',
@@ -1075,6 +1106,8 @@ chatUI.getInputBox().on('submit', async (text) => {
           }
         } else {
           chatUI.addMessage(result.stdout, 'agent');
+          // Mark agent as used for timeout buffer tracking
+          agentManager.markAgentAsUsed(agent.name);
           
           // Add agent response to history
           historyManager.writeHistory({
@@ -1126,6 +1159,8 @@ chatUI.getInputBox().on('submit', async (text) => {
                 if (retryResult.exitCode === 0 && !isRetryOutputEmpty) {
                   // Success
                   chatUI.addMessage(retryResult.stdout, 'agent');
+                  // Mark agent as used for timeout buffer tracking
+                  agentManager.markAgentAsUsed(nextAgent.name);
                   // Add agent response to history
                   historyManager.writeHistory({
                     sender: 'agent',

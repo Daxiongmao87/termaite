@@ -729,6 +729,8 @@ class WebServer {
       const result = await AgentWrapper.executeAgentCommand(agent, text, history, globalTimeout);
       
       if (result.exitCode === 0) {
+        // Mark agent as used for timeout buffer tracking
+        this.agentManager.markAgentAsUsed(agent.name);
         // Send agent response
         this.sendWebSocketMessage(clientId, {
           type: 'agent',
@@ -785,6 +787,8 @@ class WebServer {
             try {
               const retryResult = await AgentWrapper.executeAgentCommand(nextAgent, text, history, globalTimeout);
               if (retryResult.exitCode === 0) {
+                // Mark agent as used for timeout buffer tracking
+                this.agentManager.markAgentAsUsed(nextAgent.name);
                 this.sendWebSocketMessage(clientId, {
                   type: 'agent',
                   message: retryResult.stdout
@@ -833,8 +837,19 @@ class WebServer {
       timestamp: new Date().toISOString()
     });
     
-    const cmd = command.substring(1).split(' ')[0];
-    const args = command.substring(1).split(' ').slice(1);
+    // Parse command arguments, handling spaces in agent names
+    const commandText = command.substring(1);
+    const firstSpace = commandText.indexOf(' ');
+    const cmd = firstSpace === -1 ? commandText : commandText.substring(0, firstSpace);
+    const argsText = firstSpace === -1 ? '' : commandText.substring(firstSpace + 1);
+    
+    // For select command, treat the entire argument as the agent name (allowing spaces)
+    let args = [];
+    if (cmd === 'select' && argsText.trim()) {
+      args = [argsText.trim()];
+    } else {
+      args = argsText.split(' ').filter(arg => arg.length > 0);
+    }
     
     switch (cmd) {
       case 'clear':
@@ -866,7 +881,7 @@ class WebServer {
         });
         this.sendWebSocketMessage(clientId, {
           type: 'system',
-          message: '/select <agent> - Select agent for next prompt (or permanently in manual mode)'
+          message: '/select <agent> - Select agent for next prompt (or permanently in manual mode). Agent names can contain spaces.'
         });
         this.sendWebSocketMessage(clientId, {
           type: 'system',
@@ -915,9 +930,14 @@ class WebServer {
         }
         
         // Agent status header
+        let statusHeader = 'Agent status:';
+        if (status.globalTimeoutBuffer > 0) {
+          const timeoutSeconds = Math.ceil(status.globalTimeoutBuffer / 1000);
+          statusHeader += ` (global timeout buffer: ${timeoutSeconds}s)`;
+        }
         this.sendWebSocketMessage(clientId, {
           type: 'system',
-          message: 'Agent status:'
+          message: statusHeader
         });
         
         // Individual agent details with colors and context windows
@@ -930,6 +950,10 @@ class WebServer {
             statusText = 'disabled';
           } else if (agentStatus.available) {
             statusText = 'available';
+          } else if (agentStatus.inTimeoutBuffer) {
+            const remainingMs = agentStatus.remainingTimeoutBuffer;
+            const remainingSeconds = Math.ceil(remainingMs / 1000);
+            statusText = `timeout buffer (${remainingSeconds}s remaining)`;
           } else {
             statusText = 'cooldown';
           }
@@ -1111,34 +1135,34 @@ class WebServer {
         
       case 'select':
         if (args.length > 0) {
-          const agentName = args[0];
-          const agent = this.configManager.getAgents().find(a => a.name === agentName);
+          const agentIdentifier = args[0];
+          const agent = this.configManager.findAgent(agentIdentifier);
           if (agent) {
             // Determine if this is temporary based on strategy
             const isTemporary = this.agentManager.getStrategy() !== 'manual';
             
-            if (this.agentManager.selectAgent(agentName, isTemporary)) {
+            if (this.agentManager.selectAgent(agent.name, isTemporary)) {
               if (isTemporary) {
                 this.sendWebSocketMessage(clientId, {
                   type: 'system',
-                  message: `Selected ${agentName} for next prompt only`
+                  message: `Selected ${agent.name} for next prompt only`
                 });
               } else {
                 this.sendWebSocketMessage(clientId, {
                   type: 'system',
-                  message: `Selected ${agentName} (manual mode)`
+                  message: `Selected ${agent.name} (manual mode)`
                 });
               }
             } else {
               this.sendWebSocketMessage(clientId, {
                 type: 'system',
-                message: `Agent not found: ${agentName}`
+                message: `Agent not found: ${agentIdentifier}`
               });
             }
           } else {
             this.sendWebSocketMessage(clientId, {
               type: 'system',
-              message: `Agent not found: ${agentName}`
+              message: `Agent not found: ${agentIdentifier}`
             });
           }
         } else {
@@ -1162,9 +1186,14 @@ class WebServer {
           }
           
           // CRITICAL: Always display agent status like TUI does
+          let statusHeader = 'Agent status:';
+          if (status.globalTimeoutBuffer > 0) {
+            const timeoutSeconds = Math.ceil(status.globalTimeoutBuffer / 1000);
+            statusHeader += ` (global timeout buffer: ${timeoutSeconds}s)`;
+          }
           this.sendWebSocketMessage(clientId, {
             type: 'system',
-            message: 'Agent status:'
+            message: statusHeader
           });
           
           const agents = this.configManager.getAgents();
@@ -1176,6 +1205,10 @@ class WebServer {
               statusText = 'disabled';
             } else if (agentStatus.available) {
               statusText = 'available';
+            } else if (agentStatus.inTimeoutBuffer) {
+              const remainingMs = agentStatus.remainingTimeoutBuffer;
+              const remainingSeconds = Math.ceil(remainingMs / 1000);
+              statusText = `timeout buffer (${remainingSeconds}s remaining)`;
             } else {
               statusText = 'cooldown';
             }

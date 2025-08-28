@@ -1,0 +1,17 @@
+{
+  "rotationStrategy": "exhaustion",
+  "agents": [
+    {
+      "name": "test-agent-1",
+      "command": "node /home/patrick/Projects/git_projects/term.ai.te/test-agent.cjs",
+      "contextWindowTokens": 100000,
+      "timeoutSeconds": 30
+    },
+    {
+      "name": "test-agent-2",
+      "command": "node /home/patrick/Projects/git_projects/term.ai.te/test-agent.cjs",
+      "contextWindowTokens": 100000,
+      "timeoutSeconds": 30
+    }
+  ]
+}
