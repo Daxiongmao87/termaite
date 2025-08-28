@@ -78,9 +78,22 @@ class AgentManager {
     const availableAgents = this.agents.filter(agent => !this.isAgentInCooldown(agent.name));
     
     if (availableAgents.length === 0) {
-      // If all agents are in cooldown, we'll use the first one
-      // In a more advanced implementation, we might want to wait or handle this differently
-      return this.agents[0];
+      // If all agents are in cooldown, we need to honor the adaptive retry mechanism
+      // by selecting the agent with the lowest failure count
+      let lowestFailureCount = Infinity;
+      let selectedAgent = this.agents[0]; // fallback to first agent
+      
+      for (const agent of this.agents) {
+        const agentStatus = this.failedAgents.get(agent.name);
+        const failureCount = agentStatus ? agentStatus.failureCount : 0;
+        
+        if (failureCount < lowestFailureCount) {
+          lowestFailureCount = failureCount;
+          selectedAgent = agent;
+        }
+      }
+      
+      return selectedAgent;
     }
 
     switch (this.rotationStrategy) {
@@ -183,7 +196,13 @@ class AgentManager {
    * @param {string} agentName - The name of the agent that failed
    * @param {number} consecutiveFailures - The number of consecutive failures
    */
-  markAgentAsFailed(agentName, consecutiveFailures = 1) {
+  markAgentAsFailed(agentName, consecutiveFailures = null) {
+    // If consecutiveFailures is not provided, calculate it based on previous failures
+    if (consecutiveFailures === null) {
+      const agentStatus = this.failedAgents.get(agentName);
+      consecutiveFailures = agentStatus ? agentStatus.failureCount + 1 : 1;
+    }
+    
     // Calculate cooldown period based on consecutive failures
     // Start with 1 minute and double for each consecutive failure, up to 30 minutes
     const baseCooldown = 1 * 60 * 1000; // 1 minute
@@ -311,6 +330,7 @@ class AgentManager {
       agents: this.agents.map(agent => ({
         name: agent.name,
         available: !this.isAgentInCooldown(agent.name),
+        failureCount: this.failedAgents.get(agent.name)?.failureCount || 0,
         cooldownUntil: this.failedAgents.get(agent.name)?.cooldownUntil || null
       }))
     };
