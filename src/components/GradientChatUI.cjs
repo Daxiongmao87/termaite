@@ -81,7 +81,7 @@ class GradientChatUI {
       top: 0,
       left: 0,
       width: '100%-2',
-      height: '100%-4', // Leave space for input with margins
+      height: '100%-5', // Leave space for input plus info line
       content: '',
       tags: true,
       padding: {
@@ -108,7 +108,7 @@ class GradientChatUI {
     // Create a container for the prompt and input
     this.inputContainer = blessed.box({
       parent: this.mainContainer,
-      bottom: 1, // Add 1 line margin from bottom
+      bottom: 2, // Leave room for 1-line info bar below
       left: 1,   // Add 1 char margin from left
       width: '100%-4', // Account for borders (2) and margins (2)
       height: 3,
@@ -155,6 +155,21 @@ class GradientChatUI {
 
     // Append main container to the screen
     this.screen.append(this.mainContainer);
+
+    // Create a one-line info bar at the very bottom (inside the border)
+    this.infoLine = blessed.box({
+      parent: this.mainContainer,
+      bottom: 0,
+      left: 1,
+      width: '100%-4',
+      height: 1,
+      content: '',
+      tags: true,
+      style: {
+        fg: 'white',
+        bg: 'black'
+      }
+    });
 
     // Setup scrolling event handlers
     this.setupScrollHandlers();
@@ -387,6 +402,17 @@ class GradientChatUI {
       this.spinnerShowing = false;
     }
     this.screen.render();
+  }
+
+  /**
+   * Set the bottom info line content (right-aligned externally if desired)
+   * @param {string} content - The content to display in the info line
+   */
+  setInfoLine(content) {
+    if (this.infoLine) {
+      this.infoLine.setContent(content || '');
+      this.screen.render();
+    }
   }
 
   /**

@@ -31,6 +31,7 @@ const HistoryManager = require('./managers/HistoryManager.cjs');
 const AgentManager = require('./managers/AgentManager.cjs');
 const AgentWrapper = require('./services/AgentWrapper.cjs');
 const HistoryCompactor = require('./managers/HistoryCompactor.cjs');
+const AgentStatusManager = require('./managers/AgentStatusManager.cjs');
 const { estimateTokenCount } = require('./utils/tokenEstimator.cjs');
 const SpinnerAnimation = require('./components/SpinnerAnimation.cjs');
 const { spawn } = require('child_process');
@@ -157,8 +158,8 @@ if (argv.prompt) {
           agentManager.markAgentAsFailed(agent.name);
           
           // Try all available agents
-          const availableAgents = agentManager.getAvailableAgents();
-          const remainingAgents = availableAgents.filter(a => a.name !== agent.name);
+          // Use alternatives that ignore timeout buffer so rotation can proceed
+          const remainingAgents = agentManager.getAlternativeAgents(agent.name);
           
           if (remainingAgents.length > 0) {
             console.error(`Retrying with ${remainingAgents.length} alternative agents...`);
@@ -384,8 +385,22 @@ configManager.onConfigReload = () => {
 // Create the history compactor
 const historyCompactor = new HistoryCompactor(configManager, historyManager);
 
+// Create the agent status manager (for bottom info line)
+const agentStatusManager = new AgentStatusManager(configManager, historyManager, historyCompactor);
+
 // Create the chat UI
 const chatUI = new GradientChatUI(historyManager);
+
+// Helper to update the bottom-right info line
+function refreshInfoLine(currentAgentName = null) {
+  try {
+    const width = chatUI.infoLine ? chatUI.infoLine.width : (chatUI.getScreen().width - 4);
+    const content = agentStatusManager.getFormattedAgentStatus(currentAgentName, typeof width === 'number' ? width : 0);
+    chatUI.setInfoLine(content);
+  } catch (_) {
+    // Ignore UI sizing errors
+  }
+}
 
 // Create the spinner animation
 const spinnerAnimation = new SpinnerAnimation(chatUI);
@@ -430,6 +445,14 @@ if (argv.continue && loadedHistory.length > 0) {
 } else {
   // Display welcome message for new sessions
   chatUI.displayWelcomeMessage();
+}
+
+// Initial info line render (show next agent if available)
+try {
+  const peek = agentManager.peekNextAgent ? agentManager.peekNextAgent() : null;
+  refreshInfoLine(peek ? peek.name : null);
+} catch (_) {
+  refreshInfoLine(null);
 }
 
 // Function to handle slash commands
@@ -943,6 +966,8 @@ chatUI.getInputBox().on('submit', async (text) => {
       agent = agentManager.getNextAgent();
     }
     if (agent) {
+      // Update bottom info line to show current agent indicator
+      refreshInfoLine(agent.name);
       // Show which agent is being used with rich color coding
       const color = getAgentColor(agent.name);
       chatUI.addMessage(`{bold}{${color}-fg}Agent (${agent.name}):{/${color}-fg}{/bold}`, 'system');
@@ -1036,8 +1061,7 @@ chatUI.getInputBox().on('submit', async (text) => {
             agentManager.markAgentAsFailed(agent.name);
           
             // Try all available agents
-            const availableAgents = agentManager.getAvailableAgents();
-            const remainingAgents = availableAgents.filter(a => a.name !== agent.name);
+            const remainingAgents = agentManager.getAlternativeAgents(agent.name);
             
             if (remainingAgents.length > 0) {
               // Try each remaining agent until one succeeds
@@ -1125,8 +1149,7 @@ chatUI.getInputBox().on('submit', async (text) => {
           agentManager.markAgentAsFailed(agent.name);
         
           // Try all available agents
-          const availableAgents = agentManager.getAvailableAgents();
-          const remainingAgents = availableAgents.filter(a => a.name !== agent.name);
+          const remainingAgents = agentManager.getAlternativeAgents(agent.name);
           
           if (remainingAgents.length > 0) {
             // Try each remaining agent until one succeeds
@@ -1205,6 +1228,13 @@ chatUI.getInputBox().on('submit', async (text) => {
           // Refocus after agent response
           chatUI.getInputBox().focus();
           chatUI.getScreen().render();
+          // After completion, show next agent to-be executed
+          try {
+            const peek = agentManager.peekNextAgent ? agentManager.peekNextAgent() : null;
+            refreshInfoLine(peek ? peek.name : null);
+          } catch (_) {
+            refreshInfoLine(null);
+          }
         }
       }
     } else {

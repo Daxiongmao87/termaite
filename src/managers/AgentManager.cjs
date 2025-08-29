@@ -58,6 +58,62 @@ class AgentManager {
   }
 
   /**
+   * Peek at the next agent without actually selecting it (for testing)
+   * @returns {object|null} The next agent or null if no agents are available
+   */
+  peekNextAgent() {
+    if (this.agents.length === 0) {
+      return null;
+    }
+
+    // Handle temporary agent if present and available
+    if (this.temporaryAgent) {
+      const tempAgent = this.agents.find(agent => agent.name === this.temporaryAgent);
+      if (tempAgent && !this.isAgentInCooldown(tempAgent.name) && !this.isAgentInTimeoutBuffer(tempAgent.name)) {
+        return tempAgent;
+      }
+      // If temp unavailable, fall through to normal logic
+    }
+
+    const availableAgents = this.agents.filter(agent =>
+      !this.isAgentInCooldown(agent.name) && !this.isAgentInTimeoutBuffer(agent.name)
+    );
+    if (availableAgents.length === 0) {
+      return null;
+    }
+
+    switch (this.rotationStrategy) {
+      case 'round-robin': {
+        // Compute next without mutating currentAgentIndex
+        for (let i = 0; i < this.agents.length; i++) {
+          const index = (this.currentAgentIndex + i) % this.agents.length;
+          const agent = this.agents[index];
+          const availableAgent = availableAgents.find(a => a.name === agent.name);
+          if (availableAgent) {
+            return availableAgent;
+          }
+        }
+        return availableAgents[0];
+      }
+      case 'exhaustion':
+        return availableAgents.find(a => true) || null;
+      case 'random': {
+        const randomIndex = Math.floor(Math.random() * availableAgents.length);
+        return availableAgents[randomIndex];
+      }
+      case 'manual': {
+        if (this.selectedAgent) {
+          const selectedAgent = availableAgents.find(a => a.name === this.selectedAgent);
+          if (selectedAgent) return selectedAgent;
+        }
+        return availableAgents[0];
+      }
+      default:
+        return availableAgents[0];
+    }
+  }
+
+  /**
    * Get the next agent based on the rotation strategy
    * @returns {object|null} The next agent or null if no agents are available
    */
@@ -82,22 +138,9 @@ class AgentManager {
     );
     
     if (availableAgents.length === 0) {
-      // If all agents are in cooldown or timeout buffer, we need to honor the adaptive retry mechanism
-      // by selecting the agent with the lowest failure count
-      let lowestFailureCount = Infinity;
-      let selectedAgent = this.agents[0]; // fallback to first agent
-      
-      for (const agent of this.agents) {
-        const agentStatus = this.failedAgents.get(agent.name);
-        const failureCount = agentStatus ? agentStatus.failureCount : 0;
-        
-        if (failureCount < lowestFailureCount) {
-          lowestFailureCount = failureCount;
-          selectedAgent = agent;
-        }
-      }
-      
-      return selectedAgent;
+      // If all agents are in cooldown or timeout buffer, return null
+      // The calling code should handle this by showing "no agents available at this time"
+      return null;
     }
 
     switch (this.rotationStrategy) {
@@ -198,29 +241,52 @@ class AgentManager {
   /**
    * Mark an agent as failed
    * @param {string} agentName - The name of the agent that failed
-   * @param {number} consecutiveFailures - The number of consecutive failures
+   * @param {number} consecutiveFailures - The number of consecutive failures (optional, will be calculated if not provided)
    */
   markAgentAsFailed(agentName, consecutiveFailures = null) {
+    const now = Date.now();
+    const agentStatus = this.failedAgents.get(agentName);
+    
     // If consecutiveFailures is not provided, calculate it based on previous failures
     if (consecutiveFailures === null) {
-      const agentStatus = this.failedAgents.get(agentName);
-      consecutiveFailures = agentStatus ? agentStatus.failureCount + 1 : 1;
+      if (agentStatus) {
+        // Check if this is a consecutive failure (within the retry timer) or a new failure
+        if (now < agentStatus.cooldownUntil) {
+          // Agent is still in cooldown, this is a consecutive failure
+          consecutiveFailures = agentStatus.failureCount + 1;
+        } else {
+          // Agent was out of cooldown, this is a new failure sequence
+          consecutiveFailures = 1;
+        }
+      } else {
+        // First failure for this agent
+        consecutiveFailures = 1;
+      }
     }
     
-    // Calculate cooldown period based on consecutive failures
-    // Start with 1 minute and double for each consecutive failure, up to 30 minutes
+    // Calculate cooldown period based on the adaptive retry mechanism:
+    // - First failure: 1 minute retry timer
+    // - If fails again within timer: 2 minutes
+    // - If fails again within timer: 4 minutes
+    // - Continue doubling until 30 minutes cap
     const baseCooldown = 1 * 60 * 1000; // 1 minute
     const maxCooldown = 30 * 60 * 1000; // 30 minutes
     const cooldownPeriod = Math.min(baseCooldown * Math.pow(2, consecutiveFailures - 1), maxCooldown);
     
-    // Set the cooldown
-    setTimeout(() => {
+    // Clear any existing timeout for this agent
+    if (agentStatus && agentStatus.timeoutId) {
+      clearTimeout(agentStatus.timeoutId);
+    }
+    
+    // Set the cooldown with timeout cleanup
+    const timeoutId = setTimeout(() => {
       this.failedAgents.delete(agentName);
     }, cooldownPeriod);
     
     this.failedAgents.set(agentName, {
       failureCount: consecutiveFailures,
-      cooldownUntil: Date.now() + cooldownPeriod
+      cooldownUntil: now + cooldownPeriod,
+      timeoutId: timeoutId
     });
   }
 
@@ -237,6 +303,10 @@ class AgentManager {
     
     // Check if cooldown period has expired
     if (Date.now() > agentStatus.cooldownUntil) {
+      // Clear the timeout and remove from failed agents
+      if (agentStatus.timeoutId) {
+        clearTimeout(agentStatus.timeoutId);
+      }
       this.failedAgents.delete(agentName);
       return false;
     }
@@ -261,13 +331,32 @@ class AgentManager {
   }
 
   /**
+   * Mark an agent as successful (resets failure count)
+   * @param {string} agentName - The name of the agent that succeeded
+   */
+  markAgentAsSuccessful(agentName) {
+    // Clear any existing failure status and timeout
+    const agentStatus = this.failedAgents.get(agentName);
+    if (agentStatus && agentStatus.timeoutId) {
+      clearTimeout(agentStatus.timeoutId);
+    }
+    this.failedAgents.delete(agentName);
+  }
+
+  /**
    * Mark an agent as used (for timeout buffer tracking)
    * @param {string} agentName - The name of the agent that was used
+   * @param {boolean} successful - Whether the agent execution was successful (default: true)
    */
-  markAgentAsUsed(agentName) {
+  markAgentAsUsed(agentName, successful = true) {
     const timeoutBuffer = this.getAgentTimeoutBuffer(agentName);
     if (timeoutBuffer > 0) {
       this.lastUsedAgents.set(agentName, Date.now());
+    }
+    
+    // If the agent was successful, reset its failure count
+    if (successful) {
+      this.markAgentAsSuccessful(agentName);
     }
   }
 
@@ -447,6 +536,17 @@ class AgentManager {
   getAvailableAgents() {
     return this.agents.filter(agent => 
       !this.isAgentInCooldown(agent.name) && !this.isAgentInTimeoutBuffer(agent.name)
+    );
+  }
+
+  /**
+   * Get alternative agents to try after a failure. Ignores timeout buffer to allow rotation to proceed.
+   * @param {string} excludeAgentName - The agent name to exclude from alternatives
+   * @returns {array} Alternative agents not in cooldown (timeout buffer ignored)
+   */
+  getAlternativeAgents(excludeAgentName) {
+    return this.agents.filter(agent =>
+      agent.name !== excludeAgentName && !this.isAgentInCooldown(agent.name)
     );
   }
 }
