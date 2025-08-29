@@ -455,6 +455,27 @@ try {
   refreshInfoLine(null);
 }
 
+// Track the agent currently indicated (for live refresh while running)
+let currentIndicatorAgentName = null;
+
+// Periodically refresh the info line so timeoutBuffer countdown is reflected live
+const INFO_LINE_REFRESH_MS = 1000;
+const infoLineInterval = setInterval(() => {
+  try {
+    if (agentIsRunning) {
+      refreshInfoLine(currentIndicatorAgentName);
+    } else {
+      const peek = agentManager.peekNextAgent ? agentManager.peekNextAgent() : null;
+      refreshInfoLine(peek ? peek.name : null);
+    }
+  } catch (_) {}
+}, INFO_LINE_REFRESH_MS);
+
+// Ensure interval is cleared on process exit
+process.on('exit', () => {
+  try { clearInterval(infoLineInterval); } catch (_) {}
+});
+
 // Function to handle slash commands
 async function handleSlashCommand(text) {
   // Parse command arguments, handling spaces in agent names
@@ -967,7 +988,8 @@ chatUI.getInputBox().on('submit', async (text) => {
     }
     if (agent) {
       // Update bottom info line to show current agent indicator
-      refreshInfoLine(agent.name);
+      currentIndicatorAgentName = agent.name;
+      refreshInfoLine(currentIndicatorAgentName);
       // Show which agent is being used with rich color coding
       const color = getAgentColor(agent.name);
       chatUI.addMessage(`{bold}{${color}-fg}Agent (${agent.name}):{/${color}-fg}{/bold}`, 'system');
@@ -1231,8 +1253,10 @@ chatUI.getInputBox().on('submit', async (text) => {
           // After completion, show next agent to-be executed
           try {
             const peek = agentManager.peekNextAgent ? agentManager.peekNextAgent() : null;
-            refreshInfoLine(peek ? peek.name : null);
+            currentIndicatorAgentName = peek ? peek.name : null;
+            refreshInfoLine(currentIndicatorAgentName);
           } catch (_) {
+            currentIndicatorAgentName = null;
             refreshInfoLine(null);
           }
         }
