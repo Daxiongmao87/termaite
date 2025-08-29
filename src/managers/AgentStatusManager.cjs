@@ -88,9 +88,10 @@ class AgentStatusManager {
       const indicator = (currentAgentName === agent.name) ? '•' : '';
 
       // Place the current-agent indicator to the LEFT of the icon
-      const segment = `${indicator}{${agentColor}-fg}${icon}{/${agentColor}-fg}{${pctColor}-fg}${percentageLeft}%{/${pctColor}-fg}`;
+      const segment = `${indicator} {${agentColor}-fg}${icon}{/${agentColor}-fg}{${pctColor}-fg} ${percentageLeft}%{/${pctColor}-fg}`;
       parts.push(segment);
-      textLen += (`${icon}${percentageLeft}%${indicator}`).length;
+      // Visible characters: indicator + space + icon + space + digits + '%'
+      textLen += (`${indicator} ${icon} ${percentageLeft}%`).length;
     });
 
     // Add spaces between parts
