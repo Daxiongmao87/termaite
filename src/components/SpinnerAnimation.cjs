@@ -3,6 +3,8 @@ class SpinnerAnimation {
     this.chatUI = chatUI;
     this.animationInterval = null;
     this.isRunning = false;
+    this.startTime = null;
+    this.timeoutSeconds = null;
     
     // Spinner sequence: ◜ ◝ ◞ ◟
     this.spinnerFrames = ['◜ ', ' ◝', ' ◞', '◟ '];
@@ -30,17 +32,40 @@ class SpinnerAnimation {
   getRandomColor() {
     return this.colors[Math.floor(Math.random() * this.colors.length)];
   }
+
+  /**
+   * Format time in seconds to hh:mm:ss or mm:ss or ss format
+   * @param {number} seconds - Time in seconds
+   * @returns {string} Formatted time string
+   */
+  formatTime(seconds) {
+    const totalSeconds = Math.floor(seconds);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+
+    if (hours > 0) {
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else if (minutes > 0) {
+      return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+      return `${secs.toString().padStart(2, '0')}`;
+    }
+  }
   
   /**
    * Start the spinner animation
+   * @param {number} timeoutSeconds - Optional timeout in seconds
    */
-  start() {
+  start(timeoutSeconds = null) {
     // Clear any existing animation
     this.stop();
     
     this.isRunning = true;
     this.currentFrame = 0;
     this.currentColor = this.getRandomColor();
+    this.startTime = Date.now();
+    this.timeoutSeconds = timeoutSeconds;
     
     // Start the animation loop at 15fps (66.67ms)
     this.animate();
@@ -54,7 +79,23 @@ class SpinnerAnimation {
     
     // Get current spinner frame with color and bold
     const frame = this.spinnerFrames[this.currentFrame];
-    const display = `{bold}{${this.currentColor}-fg}${frame}{/${this.currentColor}-fg}{/bold} {gray-fg}Esc to cancel{/gray-fg}`;
+    
+    // Calculate elapsed time and build stopwatch display
+    let stopwatchDisplay = '';
+    if (this.startTime) {
+      const elapsedMs = Date.now() - this.startTime;
+      const elapsedSeconds = elapsedMs / 1000;
+      const elapsedTime = this.formatTime(elapsedSeconds);
+      
+      if (this.timeoutSeconds && this.timeoutSeconds > 0) {
+        const totalTime = this.formatTime(this.timeoutSeconds);
+        stopwatchDisplay = ` (${elapsedTime} / ${totalTime})`;
+      } else {
+        stopwatchDisplay = ` (${elapsedTime})`;
+      }
+    }
+    
+    const display = `{bold}{${this.currentColor}-fg}${frame}{/${this.currentColor}-fg}{/bold}${stopwatchDisplay} {gray-fg}Esc to cancel{/gray-fg}`;
     
     // Update spinner in chat log
     this.chatUI.setProgressBar(display);
@@ -81,6 +122,10 @@ class SpinnerAnimation {
       clearTimeout(this.animationInterval);
       this.animationInterval = null;
     }
+    
+    // Clear timing information
+    this.startTime = null;
+    this.timeoutSeconds = null;
     
     // Clear the progress bar
     this.chatUI.clearProgressBar();

@@ -696,11 +696,14 @@ async function handleSlashCommand(text) {
       chatUI.addMessage('Initializing project...', 'system');
       chatUI.getScreen().render();
       
-      // Start the spinner animation
-      spinnerAnimation.start();
-      
       try {
         const globalTimeout = configManager.getGlobalTimeout();
+        
+        // Calculate timeout for spinner (use globalTimeout or default)
+        const timeoutSeconds = globalTimeout !== null && globalTimeout !== undefined ? globalTimeout : 300;
+        
+        // Start the spinner animation with timeout
+        spinnerAnimation.start(timeoutSeconds > 0 ? timeoutSeconds : null);
         configManager.propagateInstructions();
         
         // Send /init to all agents in parallel
@@ -1051,8 +1054,19 @@ chatUI.getInputBox().on('submit', async (text) => {
       // Mark agent as running
       agentIsRunning = true;
       
-      // Start the spinner animation
-      spinnerAnimation.start();
+      // Calculate timeout for spinner display (same logic as AgentWrapper)
+      const globalTimeout = configManager.getGlobalTimeout();
+      let timeoutSeconds;
+      if (globalTimeout !== null && globalTimeout !== undefined) {
+        timeoutSeconds = globalTimeout;
+      } else if (agent.timeoutSeconds !== undefined) {
+        timeoutSeconds = agent.timeoutSeconds;
+      } else {
+        timeoutSeconds = 300; // Default to 300 seconds (5 minutes)
+      }
+      
+      // Start the spinner animation with timeout
+      spinnerAnimation.start(timeoutSeconds > 0 ? timeoutSeconds : null);
       
       // Propagate instructions before executing agent command
       configManager.propagateInstructions();
