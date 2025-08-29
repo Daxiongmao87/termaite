@@ -227,7 +227,7 @@ termaite
 > /init
 
 # Get help with specific file
-cat complex_algorithm.py | termaite --prompt "Explain this algorithm"
+termaite --prompt "$(printf 'Explain this algorithm:\n\n%s' "$(<complex_algorithm.py)")"
 
 # Interactive debugging session
 termaite --agent claude
@@ -256,7 +256,7 @@ termaite --rotation random
 ```bash
 #!/bin/bash
 # Automated code review
-git diff | termaite --prompt "Review these changes for potential issues"
+termaite --prompt "$(printf 'Review these changes for potential issues:\n\n%s' "$(git diff)")"
 
 # Documentation generation
 termaite --prompt "Generate API docs for functions in api.js" > docs.md
