@@ -65,11 +65,14 @@ termaite --agent claude
 
 ### 3. Interactive Chat - Web Interface
 ```bash
-# Launch web interface (opens browser to http://localhost:3000)
+# Launch web interface (visit the URL shown in the terminal; default http://127.0.0.1:7378)
 termaite --web
 
 # Launch on custom port
 termaite --web 8080
+
+# Launch with custom host and port
+termaite --web 0.0.0.0:8080
 
 # Web interface with agent continuation
 termaite --web --continue
@@ -80,8 +83,8 @@ termaite --web --continue
 # Quick command execution
 termaite --prompt "Explain quantum computing"
 
-# Pipe input for code review
-cat main.py | termaite --prompt "Review this code for security issues"
+# Pass file contents explicitly in the prompt (shell substitution)
+termaite --prompt "$(printf 'Review this code for security issues:\n\n%s' "$(<main.py)")"
 
 # Use in scripts
 result=$(termaite --prompt "Generate a secure random password")
@@ -136,8 +139,8 @@ Options:
   -p, --prompt    Enables non-interactive mode. The application will execute a
                   single prompt with the chosen agent, print the result to
                   stdout, and then exit                                 [string]
-  -w, --web       Launch web interface instead of terminal interface. 
-                  Optionally specify port (default: 3000)              [number]
+  -w, --web       Start web interface. Optional [host:]port
+                  (default: 127.0.0.1:7378)                            [string]
 ```
 
 ### Slash Commands (Interactive Mode)
