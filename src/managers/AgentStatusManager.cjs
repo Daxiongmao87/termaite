@@ -79,15 +79,17 @@ class AgentStatusManager {
     const parts = [];
     let textLen = 0; // Visible length without tags
 
+    // Use a widely supported icon with fallback (⚙ as primary, * as fallback if width issues)
+    const icon = '⚙';
     enabledAgents.forEach(agent => {
       const percentageLeft = this.getContextUsagePercentageLeft(agent);
       const pctColor = this.getPercentageColor(percentageLeft);
       const agentColor = this.getAgentColor(agent.name);
       const indicator = (currentAgentName === agent.name) ? '•' : '';
 
-      const segment = `{${agentColor}-fg}🗄{/${agentColor}-fg}{${pctColor}-fg}${percentageLeft}%{/${pctColor}-fg}${indicator}`;
+      const segment = `{${agentColor}-fg}${icon}{/${agentColor}-fg}{${pctColor}-fg}${percentageLeft}%{/${pctColor}-fg}${indicator}`;
       parts.push(segment);
-      textLen += (`🗄${percentageLeft}%${indicator}`).length;
+      textLen += (`${icon}${percentageLeft}%${indicator}`).length;
     });
 
     // Add spaces between parts

@@ -5,6 +5,7 @@ class ChatUI {
     // Create a screen object.
     this.screen = blessed.screen({
       smartCSR: true,
+      fullUnicode: true,
       title: 'TERMAITE'
     });
 

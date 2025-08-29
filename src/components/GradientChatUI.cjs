@@ -9,6 +9,7 @@ class GradientChatUI {
     // Create a screen object with enhanced color support
     this.screen = blessed.screen({
       smartCSR: true,
+      fullUnicode: true, // Enable full Unicode (emoji/surrogate pairs)
       title: 'TERMAITE',
       mouse: true,  // Enable mouse support for scrolling
       warnings: false,
