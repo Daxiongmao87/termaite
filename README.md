@@ -73,9 +73,6 @@ termaite --web 8080
 
 # Launch with custom host and port
 termaite --web 0.0.0.0:8080
-
-# Web interface with agent continuation
-termaite --web --continue
 ```
 
 ### 4. Non-Interactive Usage
@@ -96,6 +93,7 @@ result=$(termaite --prompt "Generate a secure random password")
 - **Exhaustion** (default): Prioritizes agents by cost/preference, switching only on failure
 - **Round-Robin**: Distributes load evenly across all agents
 - **Random**: Randomized selection for varied responses
+- **Manual**: Use a specifically selected agent only (set via `/strategy manual` and `/select`)
 
 ### 🛡️ **Automatic Failover**
 - Seamlessly switches to backup agents on:
@@ -121,7 +119,9 @@ result=$(termaite --prompt "Generate a secure random password")
 - Real-time WebSocket communication
 - Auto-complete and enhanced UX features
 - Arrow key history navigation
-- Most slash commands and agent management (web UI does not support `/exit`)
+- Most slash commands and agent management
+  - Not supported: `/exit` (use Ctrl+C in the terminal running the server)
+  - Limited: `/config` and `/instructions` cannot open external editors; they display paths/instructions instead
 
 ## 📋 Commands & Options
 
@@ -151,7 +151,7 @@ Options:
 /init           Initialize project (broadcasts to all agents)
 /compact        Manually trigger history compaction
 /select         Switch to specific agent
-/strategy       Change rotation strategy
+/strategy       Change rotation strategy (round-robin, exhaustion, random, manual)
 /agents         List available agents
 /instructions   View/edit agent instructions
 /sh <command>   Execute shell command
@@ -198,7 +198,7 @@ Options:
 ## 📁 Project History Management
 
 TERMAITE maintains conversation history per project:
-- Stored in `~/.termaite/projects/<project-path>/history.jsonl`
+- Stored in `~/.termaite/projects/<project-slug>/history.jsonl` (slug is the absolute project path with `/` replaced by `-`)
 - Automatic cleanup with `/clear` command
 - Smart compaction when approaching context limits
 
@@ -286,7 +286,7 @@ Automatic compaction triggers at 75% of the smallest agent's context window. Man
 ### Timeout Buffers
 - Configure a global `timeoutBuffer` (e.g., "5m") to avoid reusing the same agent too quickly.
 - You can also set per-agent `timeoutBuffer` values (e.g., "30s") inside an agent object.
-- Agents in a timeout buffer show as "timeout buffer (Ns remaining)" in status.
+- Agents in a timeout buffer are temporarily skipped by rotation until the buffer elapses. Use `/agents` to inspect availability.
 
 
 ## 🤝 Contributing
@@ -302,8 +302,11 @@ npm link  # Test locally
 ```
 
 ### Running Tests
+There is currently no automated test suite. Use the CLI interactively or the provided scripts for manual verification, for example:
+
 ```bash
-npm test
+node test-agent.cjs
+./test-five-calls.sh
 ```
 
 ## 📜 License
