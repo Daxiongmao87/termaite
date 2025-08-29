@@ -165,6 +165,7 @@ class GradientChatUI {
       width: '100%-4',
       height: 1,
       content: '',
+      align: 'right',
       tags: true,
       style: {
         fg: 'white',

@@ -77,32 +77,32 @@ class AgentStatusManager {
   getFormattedAgentStatus(currentAgentName = null, totalWidth = 0) {
     const enabledAgents = this.configManager.getEnabledAgents();
     const parts = [];
-    let textLen = 0; // Visible length without tags
 
     // Preferred icon: File cabinet (🗄)
     const icon = '🗄';
-    enabledAgents.forEach(agent => {
+    for (const agent of enabledAgents) {
       const percentageLeft = this.getContextUsagePercentageLeft(agent);
       const pctColor = this.getPercentageColor(percentageLeft);
       const agentColor = this.getAgentColor(agent.name);
       const indicator = (currentAgentName === agent.name) ? '•' : '';
 
-      // Place the current-agent indicator to the LEFT of the icon
-      const segment = `${indicator} {${agentColor}-fg}${icon}{/${agentColor}-fg}{${pctColor}-fg} ${percentageLeft}%{/${pctColor}-fg}`;
+      // Construct with explicit spaces to avoid tag adjacency issues
+      const left = indicator ? `${indicator} ` : '';
+      const iconPart = `{${agentColor}-fg}${icon}{/${agentColor}-fg}`;
+      const pctPart = `{${pctColor}-fg}${percentageLeft}%{/${pctColor}-fg}`;
+      const segment = `${left}${iconPart} ${pctPart}`;
       parts.push(segment);
-      // Visible characters: indicator + space + icon + space + digits + '%'
-      textLen += (`${indicator} ${icon} ${percentageLeft}%`).length;
-    });
+    }
 
-    // Add spaces between parts
+    // Join with a single space between agents
     const content = parts.join(' ');
-    textLen += Math.max(0, parts.length - 1);
 
+    // If width is provided we still right-pad manually; otherwise return as-is.
     if (!totalWidth || totalWidth <= 0) {
       return content;
     }
-    const padding = Math.max(0, totalWidth - textLen);
-    return ' '.repeat(padding) + content;
+    // Let the widget handle right alignment via align:'right'.
+    return content;
   }
 }
 
