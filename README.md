@@ -117,11 +117,11 @@ result=$(termaite --prompt "Generate a secure random password")
 
 ### 🌐 **Web Interface**
 - Modern web-based UI accessible via browser
-- Complete feature parity with terminal interface
+- Core feature parity with terminal interface
 - Real-time WebSocket communication
 - Auto-complete and enhanced UX features
 - Arrow key history navigation
-- All slash commands and agent management
+- Most slash commands and agent management (web UI does not support `/exit`)
 
 ## 📋 Commands & Options
 
