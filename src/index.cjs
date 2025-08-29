@@ -391,12 +391,43 @@ const agentStatusManager = new AgentStatusManager(configManager, historyManager,
 // Create the chat UI
 const chatUI = new GradientChatUI(historyManager);
 
-// Helper to update the bottom-right info line
+// Helper to strip blessed formatting tags for accurate width calculations
+function stripBlessedTags(text) {
+  if (!text) return '';
+  return text.replace(/\{[^}]+\}/g, '');
+}
+
+// Helper to shorten a path from the left with an ellipsis if too long
+function truncateLeft(text, maxLength) {
+  if (typeof text !== 'string') return '';
+  if (maxLength <= 0) return '';
+  if (text.length <= maxLength) return text;
+  if (maxLength <= 1) return '…';
+  return '…' + text.slice(-(maxLength - 1));
+}
+
+// Helper to update the bottom info line (right: agent status; left: cwd)
 function refreshInfoLine(currentAgentName = null) {
   try {
-    const width = chatUI.infoLine ? chatUI.infoLine.width : (chatUI.getScreen().width - 4);
-    const content = agentStatusManager.getFormattedAgentStatus(currentAgentName, typeof width === 'number' ? width : 0);
-    chatUI.setInfoLine(content);
+    const screenWidth = chatUI.getScreen().width || 0;
+    const totalWidth = Math.max(0, (typeof chatUI.infoLine.width === 'number') ? chatUI.infoLine.width : (screenWidth - 4));
+
+    // Right content (agent status)
+    const rightContent = agentStatusManager.getFormattedAgentStatus(currentAgentName, totalWidth);
+    const visibleRightLen = stripBlessedTags(rightContent).length;
+
+    // Left content (cwd/project path)
+    const cwdText = historyManager && historyManager.projectPath ? historyManager.projectPath : process.cwd();
+    const leftMax = Math.max(0, totalWidth - visibleRightLen - 2); // space gap + border margins
+
+    // Dynamically size left box to avoid overlap, and set text
+    if (chatUI.infoLeftLine) {
+      chatUI.infoLeftLine.width = leftMax > 0 ? leftMax : 1; // keep at least 1 to avoid layout bugs
+      chatUI.setInfoLineLeft(truncateLeft(cwdText, leftMax));
+    }
+
+    // Finally set right-aligned content
+    chatUI.setInfoLine(rightContent);
   } catch (_) {
     // Ignore UI sizing errors
   }

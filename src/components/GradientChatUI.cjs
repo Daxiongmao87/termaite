@@ -158,11 +158,29 @@ class GradientChatUI {
     this.screen.append(this.mainContainer);
 
     // Create a one-line info bar at the very bottom (inside the border)
+    // Left-aligned section (current working directory)
+    // Created first so the right-aligned box can overlay if needed
+    this.infoLeftLine = blessed.box({
+      parent: this.mainContainer,
+      bottom: 0,
+      left: 1, // slight left margin inside the border
+      width: '100%-4', // account for borders and right overlay
+      height: 1,
+      content: '',
+      align: 'left',
+      tags: true,
+      style: {
+        fg: 'white',
+        bg: 'black'
+      }
+    });
+
+    // Right-aligned section (agent status, compaction indicators, etc.)
     this.infoLine = blessed.box({
       parent: this.mainContainer,
       bottom: 0,
-      left: 1,
-      width: '100%-4',
+      left: 0,
+      width: '100%-2',
       height: 1,
       content: '',
       align: 'right',
@@ -413,6 +431,17 @@ class GradientChatUI {
   setInfoLine(content) {
     if (this.infoLine) {
       this.infoLine.setContent(content || '');
+      this.screen.render();
+    }
+  }
+
+  /**
+   * Set the bottom-left info line content (current working directory)
+   * @param {string} content - The content to display on the left side
+   */
+  setInfoLineLeft(content) {
+    if (this.infoLeftLine) {
+      this.infoLeftLine.setContent(content || '');
       this.screen.render();
     }
   }
