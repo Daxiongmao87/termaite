@@ -165,12 +165,15 @@ Options:
 {
   "rotationStrategy": "exhaustion",
   "globalTimeoutSeconds": null,  // Optional: Override all timeouts
+  "timeoutBuffer": "5m",        // Optional: Delay before reusing same agent
   "agents": [
     {
       "name": "claude",
       "command": "claude --print --dangerously-skip-permissions",
       "contextWindowTokens": 200000,
-      "timeoutSeconds": 300  // Optional: 0 for no timeout
+      "timeoutSeconds": 300,  // Optional: 0 for no timeout
+      "enabled": true,        // Optional: disable agent without removing it
+      "instructionsFilepath": "~/.claude/CLAUDE.md" // Optional
     },
     {
       "name": "gemini", 
@@ -209,9 +212,9 @@ termaite  # Creates history for this project
 cd ~/projects/api
 termaite  # Separate history for API project
 
-# Return to any project and continue
-cd ~/projects/website
-termaite -c  # Continues website conversation
+# Continue the most recent conversation (regardless of current directory)
+cd ~/any/where
+termaite -c  # Loads history from the most recently used project
 ```
 
 ## 🎯 Common Use Cases
@@ -233,8 +236,8 @@ termaite --agent claude
 # Web Interface
 # Launch web UI for comfortable development
 termaite --web
-# Navigate to http://localhost:3000
-# Use all the same commands with enhanced UX
+# Visit the URL printed in the terminal (default http://127.0.0.1:7378)
+# Use the same commands; web UI omits /exit
 ```
 
 ### Multi-Agent Strategies
@@ -279,6 +282,11 @@ Agents enter cooldown after failures:
 
 ### Token Management
 Automatic compaction triggers at 75% of the smallest agent's context window. Manual compaction available via `/compact`.
+
+### Timeout Buffers
+- Configure a global `timeoutBuffer` (e.g., "5m") to avoid reusing the same agent too quickly.
+- You can also set per-agent `timeoutBuffer` values (e.g., "30s") inside an agent object.
+- Agents in a timeout buffer show as "timeout buffer (Ns remaining)" in status.
 
 
 ## 🤝 Contributing
