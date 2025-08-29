@@ -79,8 +79,8 @@ class AgentStatusManager {
     const parts = [];
     let textLen = 0; // Visible length without tags
 
-    // Use a widely supported icon with fallback (⚙ as primary, * as fallback if width issues)
-    const icon = '⚙';
+    // Preferred icon: File cabinet (🗄)
+    const icon = '🗄';
     enabledAgents.forEach(agent => {
       const percentageLeft = this.getContextUsagePercentageLeft(agent);
       const pctColor = this.getPercentageColor(percentageLeft);
