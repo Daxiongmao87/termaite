@@ -87,7 +87,8 @@ class AgentStatusManager {
       const agentColor = this.getAgentColor(agent.name);
       const indicator = (currentAgentName === agent.name) ? '•' : '';
 
-      const segment = `{${agentColor}-fg}${icon}{/${agentColor}-fg}{${pctColor}-fg}${percentageLeft}%{/${pctColor}-fg}${indicator}`;
+      // Place the current-agent indicator to the LEFT of the icon
+      const segment = `${indicator}{${agentColor}-fg}${icon}{/${agentColor}-fg}{${pctColor}-fg}${percentageLeft}%{/${pctColor}-fg}`;
       parts.push(segment);
       textLen += (`${icon}${percentageLeft}%${indicator}`).length;
     });
