@@ -2,4 +2,4 @@
 
 2. I would like an info line in the bottom right of the window (below the text input), that presents each agent's currently estimated context usage percentage LEFT before compaction.  Each agent would be reprecented as such example: 🗄13%, where the 🗄is color-matched to the agent's color, and the percent number is color coded based on how close to 0% it is.  50-100% is green, 25-49 is yellow, and 0-24 is red.  Each active agent is represented sequentailly down the horizontal line.  A simple '•' character identifies the current AI to-be/that-is executed.  this implies that there may need to be a slight change on when the next agent is selected, at not after user submission, but after the previous agent finishes, so that the system knows where to place the '•' after the previous agent finishes their output.
 
-3.  On the same line of the compaction notification, but aligned to the bottom left side instead of the bottom right side should simply include the current working directory.
+3.  On the same line of #2's implementation, but aligned to the bottom left side instead of the bottom right side should simply include the current working directory.

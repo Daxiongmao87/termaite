@@ -410,24 +410,37 @@ function truncateLeft(text, maxLength) {
 function refreshInfoLine(currentAgentName = null) {
   try {
     const screenWidth = chatUI.getScreen().width || 0;
-    const totalWidth = Math.max(0, (typeof chatUI.infoLine.width === 'number') ? chatUI.infoLine.width : (screenWidth - 4));
+
+    // Compute inner width (exclude outer left+right borders)
+    const innerWidth = Math.max(0, screenWidth - 2);
 
     // Right content (agent status)
-    const rightContent = agentStatusManager.getFormattedAgentStatus(currentAgentName, totalWidth);
+    const rightContent = agentStatusManager.getFormattedAgentStatus(currentAgentName, innerWidth);
     const visibleRightLen = stripBlessedTags(rightContent).length;
 
-    // Left content (cwd/project path)
-    const cwdText = historyManager && historyManager.projectPath ? historyManager.projectPath : process.cwd();
-    const leftMax = Math.max(0, totalWidth - visibleRightLen - 2); // space gap + border margins
+    // Gap between left and right segments
+    const gap = 1;
 
-    // Dynamically size left box to avoid overlap, and set text
+    // Clamp right width to available inner width
+    const rightWidth = Math.max(0, Math.min(innerWidth, visibleRightLen));
+
+    // Left content (cwd/project path) and width so segments never overlap
+    const leftWidth = Math.max(0, innerWidth - rightWidth - gap);
+    const cwdText = historyManager && historyManager.projectPath ? historyManager.projectPath : process.cwd();
+
     if (chatUI.infoLeftLine) {
-      chatUI.infoLeftLine.width = leftMax > 0 ? leftMax : 1; // keep at least 1 to avoid layout bugs
-      chatUI.setInfoLineLeft(truncateLeft(cwdText, leftMax));
+      chatUI.infoLeftLine.left = 1; // inside left border
+      chatUI.infoLeftLine.width = leftWidth > 0 ? leftWidth : 1; // keep at least 1 to avoid layout bugs
+      chatUI.setInfoLineLeft(truncateLeft(cwdText, Math.max(0, leftWidth)));
     }
 
-    // Finally set right-aligned content
-    chatUI.setInfoLine(rightContent);
+    if (chatUI.infoLine) {
+      // Position the right box so it only covers the right segment, never the left
+      const rightBoxLeft = 1 + leftWidth + (leftWidth > 0 ? gap : 0); // inside left border + left segment + gap
+      chatUI.infoLine.left = rightBoxLeft;
+      chatUI.infoLine.width = Math.max(0, innerWidth - (rightBoxLeft - 1));
+      chatUI.setInfoLine(rightContent);
+    }
   } catch (_) {
     // Ignore UI sizing errors
   }
