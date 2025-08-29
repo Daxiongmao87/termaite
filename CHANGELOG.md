@@ -2,6 +2,47 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.11](https://github.com/Daxiongmao87/termaite/compare/v0.2.10...v0.2.11) (2025-08-29)
+
+
+### ⏪ Reverts
+
+* **ui:** use 🗄 icon per design; keep fullUnicode enabled ([701348a](https://github.com/Daxiongmao87/termaite/commit/701348adaad0d9a2ced509a4e3adc3dc88cecde5))
+
+
+### 🐛 Bug Fixes
+
+* adaptive retry ([e37f48d](https://github.com/Daxiongmao87/termaite/commit/e37f48d1e8e876f4b8c3eacca81ea820cd2277b7))
+* **compaction:** enhance error handling and validation ([b176670](https://github.com/Daxiongmao87/termaite/commit/b1766705c5481f2267c489fbe56116796a2b0440))
+* **ui:** enable fullUnicode and swap 🗄 with ⚙ for agent status ([c2234af](https://github.com/Daxiongmao87/termaite/commit/c2234af8c4b0bcc39d6fc4463832d81c8955911d))
+* **ui:** move current-agent dot to left of 🗄 in info line ([99f46c1](https://github.com/Daxiongmao87/termaite/commit/99f46c1d8da597c0e38ff2906090741392c818bd))
+* **ui:** resolve terminal focus issue after screen.exec() calls ([b5b609b](https://github.com/Daxiongmao87/termaite/commit/b5b609bc29a05fb44d094cd49162f249db2b6e0e))
+* **ui:** show last percentage reliably ([51fda8e](https://github.com/Daxiongmao87/termaite/commit/51fda8e90249a5f048918b5d6844b971d5a17fd7))
+* **ui:** show percentage again on info line ([1cdc34d](https://github.com/Daxiongmao87/termaite/commit/1cdc34d00c60b8972eb37c7b8a2c2b8c7b91edcc))
+
+
+### 📝 Documentation
+
+* **readme:** clarify web UI capabilities and slash command support ([6902e01](https://github.com/Daxiongmao87/termaite/commit/6902e014430e7985eef107091de5b158043a6e43))
+* **readme:** correct web host/port defaults and non-interactive examples ([2d793c8](https://github.com/Daxiongmao87/termaite/commit/2d793c82c122e1b9a2af871aac31ac8aef25847e))
+* **readme:** document timeoutBuffer and clarify web/history behavior ([328dae7](https://github.com/Daxiongmao87/termaite/commit/328dae7df22c7e6c617aacb47483fe83fbea648b))
+* **readme:** replace pipe examples with safe prompt substitution ([ff2f190](https://github.com/Daxiongmao87/termaite/commit/ff2f190d613d890ecc173ddd3ad7767a3d85b47c))
+* **readme:** sync features with code ([1e18556](https://github.com/Daxiongmao87/termaite/commit/1e18556393e8057b40f51e08477584bd34181345))
+
+
+### ✨ Features
+
+* add -h short alias for --help flag ([9021aa4](https://github.com/Daxiongmao87/termaite/commit/9021aa4d56f013f7c04f60495e67d9ffd6648129))
+* add strategy command updates rotation strategy in settings.json ([45b1ba3](https://github.com/Daxiongmao87/termaite/commit/45b1ba30d99daf779e117ccaf196a67457cb3556))
+* auto-generate agent IDs and support spaces in agent names ([443e24e](https://github.com/Daxiongmao87/termaite/commit/443e24e63c7b1e81bea823a2105e65e90f30180c))
+* implement 25% token limit ([56a261f](https://github.com/Daxiongmao87/termaite/commit/56a261f42c437506fa4060bcbad067f20c03de3d))
+* **ui:** add agent status display in web interface ([c783c77](https://github.com/Daxiongmao87/termaite/commit/c783c771586a7db1d80213b43b8be61958d5382c))
+* **ui:** add bottom info line for agent context usage and improve rotation ([59b172e](https://github.com/Daxiongmao87/termaite/commit/59b172e769ef8217be570d3b231f286ceff702be))
+* **ui:** add elapsed time display to spinner animation ([1d5ef4f](https://github.com/Daxiongmao87/termaite/commit/1d5ef4ff5d86febdec12146f8f1eb678a93da4ba))
+* **ui:** ensure bottom-left cwd is always visible and non-overlapping ([98af341](https://github.com/Daxiongmao87/termaite/commit/98af341755377c039c86569cad20a059b75cf5bb)), closes [#2](https://github.com/Daxiongmao87/termaite/issues/2)
+* **ui:** live-refresh info line indicator ([d35b18d](https://github.com/Daxiongmao87/termaite/commit/d35b18d8a594265265a1df7da0c4fca6675e0282))
+* **ui:** show current working directory on bottom-left info line ([5d111f3](https://github.com/Daxiongmao87/termaite/commit/5d111f3969bb43f12c18cfdca80c7c6dbafe6cd0)), closes [#3](https://github.com/Daxiongmao87/termaite/issues/3)
+
 ### [0.2.10](https://github.com/Daxiongmao87/termaite/compare/v0.2.9...v0.2.10) (2025-08-27)
 
 
