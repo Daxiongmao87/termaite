@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.13](https://github.com/Daxiongmao87/termaite/compare/v0.2.12...v0.2.13) (2025-08-30)
+
+
+### ✨ Features
+
+* **init:** add ESC cancellation support for /init command ([85376b9](https://github.com/Daxiongmao87/termaite/commit/85376b97c29dfc7f4777c498e4c364f4230fa09d))
+
 ### [0.2.12](https://github.com/Daxiongmao87/termaite/compare/v0.2.11...v0.2.12) (2025-08-30)
 
 
