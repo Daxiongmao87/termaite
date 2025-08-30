@@ -206,11 +206,8 @@ class GradientChatUI {
       }
     });
 
-    // Handle q to quit (but not escape, as that's for clearing input)
-    this.screen.key(['q'], () => {
-      this.screen.leave();
-      process.exit(0);
-    });
+    // Note: 'q' key handler removed to allow normal typing of 'q' character
+    // Users can still exit with Ctrl+C or /exit command
 
     // Add global key handler to restore focus when typing
     this.screen.key(['C-l'], () => {

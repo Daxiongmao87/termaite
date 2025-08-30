@@ -78,7 +78,7 @@ class ChatUI {
     this.inputBox.focus();
 
     // Handle Ctrl+C to exit.
-    this.screen.key(['escape', 'q', 'C-c'], () => {
+    this.screen.key(['escape', 'C-c'], () => {
       return process.exit(0);
     });
 

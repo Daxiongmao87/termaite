@@ -69,14 +69,14 @@ class AgentManager {
     // Handle temporary agent if present and available
     if (this.temporaryAgent) {
       const tempAgent = this.agents.find(agent => agent.name === this.temporaryAgent);
-      if (tempAgent && !this.isAgentInCooldown(tempAgent.name) && !this.isAgentInTimeoutBuffer(tempAgent.name)) {
+      if (tempAgent && !this.isAgentUnavailable(tempAgent.name)) {
         return tempAgent;
       }
       // If temp unavailable, fall through to normal logic
     }
 
     const availableAgents = this.agents.filter(agent =>
-      !this.isAgentInCooldown(agent.name) && !this.isAgentInTimeoutBuffer(agent.name)
+      !this.isAgentUnavailable(agent.name)
     );
     if (availableAgents.length === 0) {
       return null;
@@ -126,15 +126,15 @@ class AgentManager {
     if (this.temporaryAgent) {
       const tempAgent = this.agents.find(agent => agent.name === this.temporaryAgent);
       this.temporaryAgent = null; // Clear after use
-      if (tempAgent && !this.isAgentInCooldown(tempAgent.name) && !this.isAgentInTimeoutBuffer(tempAgent.name)) {
+      if (tempAgent && !this.isAgentUnavailable(tempAgent.name)) {
         return tempAgent;
       }
-      // If temporary agent is in cooldown or timeout buffer, fall through to normal logic
+      // If temporary agent is unavailable, fall through to normal logic
     }
 
-    // Filter out agents that are currently in cooldown or timeout buffer
+    // Filter out agents that are currently unavailable due to any timeout mechanism
     const availableAgents = this.agents.filter(agent => 
-      !this.isAgentInCooldown(agent.name) && !this.isAgentInTimeoutBuffer(agent.name)
+      !this.isAgentUnavailable(agent.name)
     );
     
     if (availableAgents.length === 0) {
@@ -312,6 +312,43 @@ class AgentManager {
     }
     
     return true;
+  }
+
+  /**
+   * Get the remaining cooldown time for an agent
+   * @param {string} agentName - The name of the agent
+   * @returns {number} Remaining cooldown time in milliseconds, or 0 if not in cooldown
+   */
+  getRemainingCooldown(agentName) {
+    const agentStatus = this.failedAgents.get(agentName);
+    if (!agentStatus) {
+      return 0;
+    }
+    
+    const remaining = agentStatus.cooldownUntil - Date.now();
+    return Math.max(0, remaining);
+  }
+
+  /**
+   * Get the effective timeout for an agent (maximum of cooldown and timeout buffer)
+   * @param {string} agentName - The name of the agent
+   * @returns {number} Remaining effective timeout in milliseconds, or 0 if agent is available
+   */
+  getEffectiveTimeout(agentName) {
+    const cooldownRemaining = this.getRemainingCooldown(agentName);
+    const timeoutBufferRemaining = this.getRemainingTimeoutBuffer(agentName);
+    
+    // Return the longer of the two timeouts
+    return Math.max(cooldownRemaining, timeoutBufferRemaining);
+  }
+
+  /**
+   * Check if an agent is effectively unavailable due to any timeout mechanism
+   * @param {string} agentName - The name of the agent
+   * @returns {boolean} True if the agent is unavailable due to any timeout
+   */
+  isAgentUnavailable(agentName) {
+    return this.getEffectiveTimeout(agentName) > 0;
   }
 
   /**
@@ -495,11 +532,13 @@ class AgentManager {
       agents: allAgents.map(agent => ({
         name: agent.name,
         enabled: agent.enabled !== false, // Default to true if not specified
-        available: agent.enabled !== false && !this.isAgentInCooldown(agent.name) && !this.isAgentInTimeoutBuffer(agent.name),
+        available: agent.enabled !== false && !this.isAgentUnavailable(agent.name),
         failureCount: this.failedAgents.get(agent.name)?.failureCount || 0,
         cooldownUntil: this.failedAgents.get(agent.name)?.cooldownUntil || null,
+        remainingCooldown: this.getRemainingCooldown(agent.name),
         inTimeoutBuffer: this.isAgentInTimeoutBuffer(agent.name),
         remainingTimeoutBuffer: this.getRemainingTimeoutBuffer(agent.name),
+        effectiveTimeout: this.getEffectiveTimeout(agent.name),
         timeoutBuffer: this.getAgentTimeoutBuffer(agent.name)
       }))
     };
@@ -530,23 +569,23 @@ class AgentManager {
   }
 
   /**
-   * Get all available agents (not in cooldown or timeout buffer)
+   * Get all available agents (not in any timeout)
    * @returns {array} The list of available agents
    */
   getAvailableAgents() {
     return this.agents.filter(agent => 
-      !this.isAgentInCooldown(agent.name) && !this.isAgentInTimeoutBuffer(agent.name)
+      !this.isAgentUnavailable(agent.name)
     );
   }
 
   /**
-   * Get alternative agents to try after a failure. Ignores timeout buffer to allow rotation to proceed.
+   * Get alternative agents to try after a failure. Now respects both timeout mechanisms.
    * @param {string} excludeAgentName - The agent name to exclude from alternatives
-   * @returns {array} Alternative agents not in cooldown (timeout buffer ignored)
+   * @returns {array} Alternative agents that are available (not in any timeout)
    */
   getAlternativeAgents(excludeAgentName) {
     return this.agents.filter(agent =>
-      agent.name !== excludeAgentName && !this.isAgentInCooldown(agent.name)
+      agent.name !== excludeAgentName && !this.isAgentUnavailable(agent.name)
     );
   }
 }
