@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.2.12](https://github.com/Daxiongmao87/termaite/compare/v0.2.11...v0.2.12) (2025-08-30)
+
+
+### ♻️ Code Refactoring
+
+* **ui:** improve key handling and agent availability logic ([7b95b77](https://github.com/Daxiongmao87/termaite/commit/7b95b7756a5dc359fea4d2de8606f728ad8acac7))
+
 ### [0.2.11](https://github.com/Daxiongmao87/termaite/compare/v0.2.10...v0.2.11) (2025-08-29)
 
 
