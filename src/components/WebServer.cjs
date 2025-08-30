@@ -612,8 +612,8 @@ class WebServer {
    */
   handleCancelRequest(clientId) {
     if (this.agentIsRunning) {
-      // Cancel the current agent command
-      if (AgentWrapper.cancelCurrentCommand()) {
+      // Cancel all current agent commands (works for both single and /init)
+      if (AgentWrapper.cancelAllCurrentCommands()) {
         this.agentIsRunning = false;
         this.sendWebSocketMessage(clientId, {
           type: 'system',
@@ -1310,13 +1310,18 @@ class WebServer {
                 type: 'system',
                 message: `Initializing ${agent.name}...`
               });
-              await AgentWrapper.executeAgentCommand(agent, '/init', [], globalTimeout);
+              await AgentWrapper.executeAgentCommand(agent, '/init', [], globalTimeout, true);
               // Discard the response - agents handle their own initialization
             } catch (error) {
-              this.sendWebSocketMessage(clientId, {
-                type: 'system',
-                message: `Warning: ${agent.name} initialization failed: ${error.message}`
-              });
+              // Check if this was a cancellation (SIGKILL signal or killed message)
+              if (error.message && (error.message.includes('SIGKILL') || error.message.includes('killed'))) {
+                // Cancelled - do nothing, cancellation handler will clean up
+              } else {
+                this.sendWebSocketMessage(clientId, {
+                  type: 'system',
+                  message: `Warning: ${agent.name} initialization failed: ${error.message}`
+                });
+              }
             }
           });
           

@@ -3,6 +3,8 @@ const { spawn } = require('child_process');
 class AgentWrapper {
   // Track the current running process for cancellation
   static currentProcess = null;
+  // Track multiple processes for /init cancellation
+  static currentProcesses = new Set();
   
   /**
    * Cancel the currently running agent command
@@ -18,14 +20,40 @@ class AgentWrapper {
   }
   
   /**
+   * Cancel all currently running agent commands (for /init)
+   */
+  static cancelAllCurrentCommands() {
+    let cancelledAny = false;
+    
+    // Cancel single current process
+    if (this.currentProcess) {
+      this.currentProcess.kill('SIGKILL');
+      this.currentProcess = null;
+      cancelledAny = true;
+    }
+    
+    // Cancel all tracked processes
+    for (const process of this.currentProcesses) {
+      if (process && !process.killed) {
+        process.kill('SIGKILL');
+        cancelledAny = true;
+      }
+    }
+    this.currentProcesses.clear();
+    
+    return cancelledAny;
+  }
+  
+  /**
    * Executes an agent command with timeout and I/O piping
    * @param {object} agent - The agent object containing command and timeout
    * @param {string} input - The input to pipe to the command
    * @param {array} history - The chat history
    * @param {number} globalTimeout - Global timeout override from settings
+   * @param {boolean} trackMultiple - Whether to track this process for multi-process cancellation
    * @returns {Promise<{stdout: string, stderr: string, exitCode: number}>}
    */
-  static async executeAgentCommand(agent, input, history, globalTimeout = null) {
+  static async executeAgentCommand(agent, input, history, globalTimeout = null, trackMultiple = false) {
     // Augment the prompt with a request for a summary
     const augmentedInput = this.augmentPrompt(input, history, agent);
     
@@ -45,8 +73,12 @@ class AgentWrapper {
       // Spawn the process
       const process = spawn(agent.command, { shell: true });
       
-      // Track this as the current process for cancellation
-      this.currentProcess = process;
+      // Track this process for cancellation
+      if (trackMultiple) {
+        this.currentProcesses.add(process);
+      } else {
+        this.currentProcess = process;
+      }
       
       let stdout = '';
       let stderr = '';
@@ -64,7 +96,12 @@ class AgentWrapper {
       // Handle process close
       process.on('close', (code) => {
         if (timeoutId) clearTimeout(timeoutId);
-        this.currentProcess = null;  // Clear the tracked process
+        // Clear the tracked process
+        if (trackMultiple) {
+          this.currentProcesses.delete(process);
+        } else {
+          this.currentProcess = null;
+        }
         
         // Treat empty stdout as a failure even if exit code is 0
         if (code === 0 && (!stdout || stdout.trim() === '')) {
@@ -77,7 +114,12 @@ class AgentWrapper {
       // Handle process error
       process.on('error', (error) => {
         if (timeoutId) clearTimeout(timeoutId);
-        this.currentProcess = null;  // Clear the tracked process
+        // Clear the tracked process
+        if (trackMultiple) {
+          this.currentProcesses.delete(process);
+        } else {
+          this.currentProcess = null;
+        }
         reject(error);
       });
       
@@ -85,7 +127,12 @@ class AgentWrapper {
       if (hasTimeout) {
         timeoutId = setTimeout(() => {
           process.kill();
-          this.currentProcess = null;  // Clear the tracked process
+          // Clear the tracked process
+          if (trackMultiple) {
+            this.currentProcesses.delete(process);
+          } else {
+            this.currentProcess = null;
+          }
           reject(new Error(`Agent command timed out after ${timeoutSeconds} seconds`));
         }, timeoutSeconds * 1000);
       }

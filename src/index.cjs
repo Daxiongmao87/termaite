@@ -696,6 +696,9 @@ async function handleSlashCommand(text) {
       chatUI.addMessage('Initializing project...', 'system');
       chatUI.getScreen().render();
       
+      // Track messages to potentially revert on cancellation (1 message: "Initializing project...")
+      const messagesToRevert = 1;
+      
       try {
         const globalTimeout = configManager.getGlobalTimeout();
         
@@ -706,12 +709,31 @@ async function handleSlashCommand(text) {
         spinnerAnimation.start(timeoutSeconds > 0 ? timeoutSeconds : null);
         configManager.propagateInstructions();
         
+        // Track if we cancelled to skip finally cleanup
+        let wasCancelled = false;
+        
+        // Add ESC key handler for cancellation
+        const escHandler = (ch, key) => {
+          if (key && key.name === 'escape') {
+            // Cancel all agent commands
+            if (AgentWrapper.cancelAllCurrentCommands()) {
+              // Immediate visual reversion
+              wasCancelled = true;
+              spinnerAnimation.stop();
+              chatUI.removeLastMessages(messagesToRevert);
+              chatUI.getScreen().removeListener('keypress', escHandler);
+              chatUI.addMessage('Initialization cancelled by user', 'system');
+            }
+          }
+        };
+        chatUI.getScreen().on('keypress', escHandler);
+        
         // Send /init to all agents in parallel
         const initPromises = allAgents.map(async (agent) => {
           try {
             chatUI.addMessage(`Initializing ${agent.name}...`, 'system');
             chatUI.getScreen().render();
-            const result = await AgentWrapper.executeAgentCommand(agent, '/init', [], globalTimeout);
+            const result = await AgentWrapper.executeAgentCommand(agent, '/init', [], globalTimeout, true);
             // Check if initialization failed due to empty response
             const isOutputEmpty = !result.stdout || result.stdout.trim() === '';
             if (result.exitCode !== 0 || isOutputEmpty) {
@@ -723,13 +745,21 @@ async function handleSlashCommand(text) {
             }
             // Discard the response - agents handle their own initialization
           } catch (error) {
-            chatUI.addMessage(`Warning: ${agent.name} initialization failed: ${error.message}`, 'system');
+            // Check if this was a cancellation (SIGKILL signal or killed message)
+            if (error.message && (error.message.includes('SIGKILL') || error.message.includes('killed'))) {
+              // Cancelled - do nothing, ESC handler already cleaned up
+            } else {
+              chatUI.addMessage(`Warning: ${agent.name} initialization failed: ${error.message}`, 'system');
+            }
           }
         });
         
         // Wait for all agents to complete
         await Promise.all(initPromises);
-        chatUI.addMessage('Initialization complete', 'system');
+        
+        if (!wasCancelled) {
+          chatUI.addMessage('Initialization complete', 'system');
+        }
         
       } catch (error) {
         chatUI.addMessage(`Error during initialization: ${error.message}`, 'system');
